@@ -19,7 +19,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ocr", action="store_true")
     ap.add_argument("--out", default="")
+    ap.add_argument("--only", default="", help="comma-separated applicant ids, e.g. K01,K02")
     args = ap.parse_args()
+    only = {a.strip().upper() for a in args.only.split(",") if a.strip()}
     if args.ocr:
         router = ModelRouter()
         router.available = lambda: False  # type: ignore[method-assign]
@@ -32,6 +34,8 @@ def main() -> None:
         if not m:
             continue
         applicant, doc_type = m.groups()
+        if only and applicant not in only:
+            continue
         data = path.read_bytes()
         ext = ocr.extract(data, doc_type)
         ext["checks"] = [c.to_dict() for c in kyc.document_checks(doc_type, ext, data)]

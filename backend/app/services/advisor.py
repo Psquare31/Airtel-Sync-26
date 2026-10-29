@@ -164,7 +164,8 @@ def parse_message(text: str, expecting: str | None, prof: Profile) -> dict:
     if re.search(r"\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]\b", t.upper()):
         upd["has_gstin"] = True
     elif re.search(r"gst", low):
-        upd["has_gstin"] = not re.search(r"(no|without|not|nahi|don't have|dont have)\s+(\w+\s)?gst|gst\s+(nahi|not)", low)
+        negated = re.search(r"(no|without|not|nahi|don't have|dont have)\s+(\w+\s)?gst|gst\s+(nahi|not)", low)
+        upd["has_gstin"] = not (negated or any(w in t for w in HINDI_NO))
     elif expecting == "has_gstin":
         if re.search(NO, low) or any(w in t for w in HINDI_NO):
             upd["has_gstin"] = False
@@ -317,8 +318,9 @@ def explain(rec: dict, prof: Profile, lang: str) -> dict:
 
 
 def _fallback_summary(prof: Profile, lang: str) -> str:
-    seg = SEGMENT_NAMES.get(prof.segment or "micro", "small business")
+    kind = (prof.business_type or {"micro": "shop", "prof": "office", "multi": "multi-location business",
+                                    "mfg": "manufacturing unit"}.get(prof.segment or "micro", "business")).lower()
     if lang == "hi":
         return f"आपके {prof.business_type or 'बिज़नेस'} के लिए इंटरनेट, मोबाइल और ज़रूरी डिजिटल सेवाएँ, एक ही बिल और एक सपोर्ट नंबर के साथ।"
-    return (f"Built for a {seg.lower()} business like yours: everything you need on one bill with one support number. "
-            "Switch add-ons on or off below; the price updates instantly.")
+    return (f"Picked for a {kind} with {prof.employees or 1} people and {prof.sites or 1} location(s): everything on one bill "
+            "with one support number. Switch add-ons on or off below; the price updates instantly.")

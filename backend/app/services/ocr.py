@@ -11,6 +11,7 @@ import re
 
 import numpy as np
 from PIL import Image
+from rapidfuzz import fuzz
 
 from app.services.llm import LLMUnavailable, get_router
 
@@ -104,11 +105,27 @@ def _strip_watermark(img: Image.Image) -> np.ndarray:
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     text = (np.maximum(np.maximum(r, g), b) < 150) | ((r - g < 40) & (r < 200) & (g < 200) & (b < 200))
     out = np.where(text, 0, 255).astype(np.uint8)
+    angle = _skew_angle(out)
+    if abs(angle) >= 0.4:
+        out = np.asarray(Image.fromarray(out).rotate(angle, resample=Image.BILINEAR, fillcolor=255, expand=False))
+        out = np.where(out < 128, 0, 255).astype(np.uint8)
     # crop the empty lower part of the page: OCR time scales with area
     rows = np.where((out == 0).sum(axis=1) > 2)[0]
     if len(rows):
         out = out[: min(out.shape[0], rows.max() + 20)]
     return np.stack([out] * 3, axis=-1)
+
+
+def _skew_angle(binary: np.ndarray) -> float:
+    """Angle (degrees) that makes text rows horizontal: maximises row-profile variance."""
+    small = Image.fromarray(binary).resize((400, max(1, int(binary.shape[0] * 400 / binary.shape[1]))))
+    best, best_score = 0.0, -1.0
+    for angle in np.arange(-8, 8.01, 0.5):
+        rot = np.asarray(small.rotate(float(angle), fillcolor=255))
+        score = float(np.var((rot < 128).sum(axis=1)))
+        if score > best_score:
+            best, best_score = float(angle), score
+    return best
 
 
 _engine = None
@@ -142,10 +159,17 @@ def _match_label(text: str) -> str | None:
     if t in LABELS:
         return LABELS[t]
     squashed = t.replace(" ", "")
+    best, best_score = None, 0.0
     for label, key in LABELS.items():
-        if squashed == label.replace(" ", ""):
+        target = label.replace(" ", "")
+        if squashed == target:
             return key
-    return None
+        # OCR slips like 'Enterprlse name'; short labels must match exactly
+        if len(target) >= 8:
+            score = fuzz.ratio(squashed, target)
+            if score > best_score:
+                best, best_score = key, score
+    return best if best_score >= 88 else None
 
 
 def ocr_extract(image_bytes: bytes, doc_type: str) -> dict:
@@ -169,18 +193,28 @@ def ocr_extract(image_bytes: bytes, doc_type: str) -> dict:
     def take(b: dict) -> None:
         used.add(id(b))
 
-    for lab in labels:
-        tol = max(lab["h"], 18) * 0.9
-        same_row = [v for v in values if id(v) not in used and abs(v["y"] - lab["y"]) <= tol and v["x0"] > lab["x1"]]
-        if same_row:
-            v = min(same_row, key=lambda v: v["x0"])
+    # same-row pairs first, closest in y wins (robust to slightly skewed rows)
+    pairs = sorted(
+        ((abs(v["y"] - lab["y"]), li, vi) for li, lab in enumerate(labels) for vi, v in enumerate(values)
+         if v["x0"] > lab["x1"] and abs(v["y"] - lab["y"]) <= min(max(lab["h"], 18) * 0.9, 28)),
+        key=lambda p: p[0],
+    )
+    row_value: dict[int, dict] = {}
+    for _, li, vi in pairs:
+        if li in row_value or id(values[vi]) in used:
+            continue
+        row_value[li] = values[vi]
+        used.add(id(values[vi]))
+    for li, lab in enumerate(labels):
+        if li in row_value:
+            v = row_value[li]
         else:  # stacked layout: value directly below the label
             below = [v for v in values if id(v) not in used and 0 < v["y"] - lab["y"] <= 3 * max(lab["h"], 18)
                      and abs(v["x0"] - lab["x0"]) < 40]
             if not below:
                 continue
             v = min(below, key=lambda v: v["y"])
-        take(v)
+            take(v)
         if lab["key"] == "address" and fields.get("address"):
             fields["address"] = _join_wrapped(fields["address"], v["text"])
         else:

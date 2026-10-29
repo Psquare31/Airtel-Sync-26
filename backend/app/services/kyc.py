@@ -118,10 +118,14 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
         if doc_type not in docs:
             checks.append(Check("missing_" + doc_type, FAIL, f"{DOC_LABELS[doc_type]} is missing.", doc_type))
 
+    # an unreadable photo already asks for a retake; don't pile field errors on top
+    unreadable = {t for t, d in docs.items()
+                  if any(c.get("id") in ("image_quality", "legible") and c.get("status") == FAIL for c in d.get("checks", []))}
+
     # --- GSTIN
     gstin_raw = _get(docs, "gst_certificate", "gstin") or declared.get("gstin", "")
     gst_rec = None
-    if "gst_certificate" in docs or declared.get("gstin"):
+    if ("gst_certificate" in docs and "gst_certificate" not in unreadable) or declared.get("gstin"):
         gstin, repaired = repair_gstin(gstin_raw)
         problems = v.validate_gstin(gstin)
         if problems:

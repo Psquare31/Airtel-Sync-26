@@ -11,6 +11,7 @@ from app.db import Journey, KycDocument, audit, now, session
 from app.graph.journey import get_graph
 from app.services import kyc as kyc_service
 from app.services import ocr
+from app.services.profile import Profile
 from app.services.validators import mask, normalize_id
 
 router = APIRouter(prefix="/api/journeys", tags=["journey"])
@@ -48,6 +49,7 @@ def view(jid: str) -> dict:
         "lang": v.get("lang"),
         "messages": [{"role": m["role"], "content": m["content"]} for m in v.get("messages", [])],
         "profile": v.get("profile"),
+        "missing": Profile(**(v.get("profile") or {})).missing(),
         "recommendation": v.get("recommendation"),
         "explanation": v.get("explanation"),
         "quote": (pending or {}).get("quote") if (pending or {}).get("kind") == "quote" else v.get("quote"),
