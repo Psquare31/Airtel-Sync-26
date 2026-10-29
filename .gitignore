@@ -1,0 +1,22 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+backend/*.db
+backend/*.db-*
+# env
+.env
+.env.*
+!.env.example
+# node
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+# os/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# deck build outputs
+docs/deck/*.tmp*
