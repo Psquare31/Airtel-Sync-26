@@ -96,6 +96,7 @@ export interface Journey {
 
 export interface OrderView {
   id: string
+  journey_id: string
   business_name?: string
   timeline: { key: string; label: string; eta: string; done_at: string | null }[]
   current: string

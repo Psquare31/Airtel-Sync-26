@@ -118,6 +118,7 @@ def view(order: Order) -> dict:
     current = next((t for t in order.timeline if not t["done_at"]), None)
     return {
         "id": order.id,
+        "journey_id": order.journey_id,
         "business_name": order.business_name,
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "timeline": order.timeline,

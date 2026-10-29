@@ -1,0 +1,47 @@
+# Render Blueprint: two web services from one repo, one per branch.
+# prod is kept warm by UptimeRobot hitting /health; dev may sleep.
+services:
+  - type: web
+    name: udyam-api
+    runtime: docker
+    plan: free
+    branch: prod
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: prod
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: BACKOFFICE_KEY
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+  - type: web
+    name: udyam-api-dev
+    runtime: docker
+    plan: free
+    branch: dev
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: dev
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: BACKOFFICE_KEY
+        value: demo
+      - key: DEMO_MODE
+        value: "true"

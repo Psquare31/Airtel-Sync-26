@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Loader2, MessageCircle, Send } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, MessageCircle, Send, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
@@ -14,6 +14,7 @@ export default function Tracker() {
   const [q, setQ] = useState('')
   const [answer, setAnswer] = useState('')
   const [asking, setAsking] = useState(false)
+  const [privacy, setPrivacy] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -28,6 +29,11 @@ export default function Tracker() {
 
   if (err) return <p className="p-6 text-bad">{err}</p>
   if (!order) return <p className="p-6 text-muted">…</p>
+
+  async function withdrawMsg(purposes: string[]) {
+    const r = await api.withdraw(order!.journey_id, purposes)
+    return purposes.includes('marketing') ? 'Offers stopped.' : `Erased ${r.documents_erased} document record(s).`
+  }
 
   async function ask(e: React.FormEvent) {
     e.preventDefault()
@@ -122,6 +128,22 @@ export default function Tracker() {
           </div>
         ))}
       </section>
+
+      <details className="card p-4 text-sm">
+        <summary className="flex cursor-pointer items-center gap-2 font-medium">
+          <ShieldCheck size={16} className="text-ok" /> Your data &amp; consent
+        </summary>
+        <p className="mt-2 text-muted">Document photos were deleted after reading. You can stop offers or erase the extracted KYC details at any time.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className="chip" onClick={async () => setPrivacy(await withdrawMsg(['marketing']))}>
+            Stop offers
+          </button>
+          <button className="chip" onClick={async () => setPrivacy(await withdrawMsg(['kyc_verification']))}>
+            Erase my KYC details
+          </button>
+        </div>
+        {privacy && <p className="mt-2 text-ok">{privacy}</p>}
+      </details>
 
       {!order.complete && (
         <button className="btn btn-ghost text-sm" onClick={async () => setOrder(await api.advance(id))}>

@@ -194,6 +194,18 @@ def digilocker(jid: str, body: DigiLockerBody):
     return {"documents": pulled}
 
 
+class WithdrawBody(BaseModel):
+    purposes: list[str]
+
+
+@router.post("/{jid}/consent/withdraw")
+def withdraw_consent(jid: str, body: WithdrawBody):
+    from app.services.retention import withdraw
+
+    allowed = {"kyc_verification", "service_activation", "marketing"}
+    return withdraw(jid, [p for p in body.purposes if p in allowed])
+
+
 @router.get("/{jid}/documents")
 def list_documents(jid: str):
     with session() as s:

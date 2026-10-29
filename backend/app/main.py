@@ -9,6 +9,7 @@ from app.db import get_engine
 from app.graph.journey import get_graph
 from app.routers import backoffice, journey, misc
 from app.services.llm import get_router
+from app.services.retention import purge_expired
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -31,6 +32,7 @@ def startup() -> None:
     get_dataset()
     get_engine()
     get_graph()
+    purge_expired()
 
 
 @app.get("/health")
