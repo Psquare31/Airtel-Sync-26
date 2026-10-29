@@ -86,7 +86,7 @@ Current offline KYC result on the specimen pack:
 |---|---|---|
 | Frontend (Vercel, root `frontend/`) | Preview URL | Production URL |
 | API (Render Docker, `render.yaml`) | `udyam-api-dev` (sleeps when idle) | `udyam-api`, kept awake by UptimeRobot |
-| Database (Neon) | branch `dev` | branch `main` |
+| Database (Neon) | branch `dev` | branch `production` |
 
 ### One-time setup checklist
 
@@ -95,7 +95,7 @@ Current offline KYC result on the specimen pack:
    - Set `dev` as the default branch.
    - Add a branch-protection rule on `prod`: require a PR and require the CI checks to pass.
 2. **Neon**:
-   - Create a project. The `main` branch is created automatically.
+   - Create a project. The default branch (`production`) is created automatically.
    - Create a branch called `dev`.
    - Copy both pooled connection strings.
 3. **Render**:

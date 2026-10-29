@@ -94,6 +94,6 @@ graph TD
 |---|---|---|
 | Frontend | Vercel preview URL | Vercel production URL |
 | API | Render `udyam-api-dev` (may sleep) | Render `udyam-api`, kept warm by UptimeRobot on `/health` |
-| Database | Neon branch `dev` | Neon branch `main` |
+| Database | Neon branch `dev` | Neon branch `production` |
 
 GitHub Actions runs pytest, the frontend lint and build, and a Docker build on every push or PR. A PR merges `dev → prod`.
