@@ -73,3 +73,21 @@ def test_parse_reset_formats():
 def test_redact():
     out = redact("my gst is 37IHKXV5167L1ZS call 9876543210 or a@b.com")
     assert "37IHK" not in out and "9876543210" not in out and "a@b.com" not in out
+
+
+class NotFound(Exception):
+    status_code = 404
+
+
+def test_missing_model_is_parked_for_an_hour():
+    r = ModelRouter(client=FakeClient({"gone": NotFound("model_not_found"), "b": '{"ok": 1}'}))
+    _, info = r.chat_json([{"role": "user", "content": "x"}], models=["gone", "b"])
+    assert info.model == "b" and r.status(["gone"])[0]["cooldown_s"] > 3000
+
+
+def test_catalog_filters_unavailable_models():
+    client = FakeClient({"a": '{"ok": 1}'})
+    client.models = SimpleNamespace(list=lambda: SimpleNamespace(data=[SimpleNamespace(id="a")]))
+    r = ModelRouter(client=client)
+    _, info = r.chat_json([{"role": "user", "content": "x"}], models=["retired", "a"])
+    assert info.model == "a" and client.calls == ["a"]

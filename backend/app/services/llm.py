@@ -32,7 +32,6 @@ class LLMUnavailable(Exception):
 
 # per-model request tweaks (sent via extra_body)
 MODEL_PARAMS: dict[str, dict[str, Any]] = {
-    "qwen/qwen3-32b": {"reasoning_format": "hidden"},
     "openai/gpt-oss-120b": {"reasoning_effort": "low"},
     "openai/gpt-oss-20b": {"reasoning_effort": "low"},
 }
@@ -68,6 +67,8 @@ class ModelRouter:
         self._lock = threading.Lock()
         self.default_cooldown_s = default_cooldown_s
         self.last_call: CallInfo | None = None
+        self._catalog: set[str] | None = None
+        self._catalog_at = 0.0
 
     @property
     def client(self):
@@ -82,6 +83,33 @@ class ModelRouter:
 
     def available(self) -> bool:
         return bool(self._client) or bool(get_settings().groq_api_key)
+
+    def catalog(self) -> set[str] | None:
+        """Model ids this key can use (refreshed hourly); None if the listing fails."""
+        if self._catalog is not None and time.monotonic() - self._catalog_at < 3600:
+            return self._catalog
+        lister = getattr(self.client, "models", None)
+        if lister is None:
+            return None
+        try:
+            self._catalog = {m.id for m in lister.list().data}
+            self._catalog_at = time.monotonic()
+        except LLMUnavailable:
+            raise
+        except Exception as err:  # noqa: BLE001 - listing is an optimisation only
+            log.warning("model listing failed: %s", str(err)[:120])
+            self._catalog_at = time.monotonic() - 3300  # retry in ~5 minutes
+        return self._catalog
+
+    def usable(self, models: list[str]) -> list[str]:
+        cat = self.catalog()
+        if not cat:
+            return models
+        kept = [m for m in models if m in cat]
+        dropped = [m for m in models if m not in cat]
+        if dropped:
+            log.info("skipping models not available to this key: %s", dropped)
+        return kept or models
 
     def cooling(self, model: str) -> bool:
         with self._lock:
@@ -116,7 +144,7 @@ class ModelRouter:
         temperature: float = 0.3,
         max_tokens: int = 800,
     ) -> tuple[str, CallInfo]:
-        models = models or get_settings().chat_models
+        models = self.usable(models or get_settings().chat_models)
         tried: list[str] = []
         for model in models:
             if self.cooling(model):
@@ -156,7 +184,10 @@ class ModelRouter:
                     if status == 429 or "rate_limit" in str(err).lower():
                         self.cool_down(model, self._cooldown_from_error(err))
                         break
-                    if isinstance(err, json.JSONDecodeError) or status in (400, 404, 413, 422):
+                    if status == 404:  # retired or not enabled for this key
+                        self.cool_down(model, 3600)
+                        break
+                    if isinstance(err, json.JSONDecodeError) or status in (400, 413, 422):
                         log.warning("model %s rejected request: %s", model, str(err)[:200])
                         break
                     if status in (401, 403):
@@ -216,7 +247,7 @@ class ModelRouter:
 
 
 def _strip_fences(text: str) -> str:
-    text = text.strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text)
