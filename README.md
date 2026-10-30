@@ -6,7 +6,7 @@ Prototype for **YTL Hackathon 2026 · Enterprise Track A (Airtel SYNC)**. A smal
 2. **Quote & checkout**: one transparent monthly price with GST shown. Add-ons toggle on and off, quantities can change, the price drops with a 24-month contract, and the setup fee can be spread into instalments.
 3. **Smart KYC**:
    - consent screen with separate purposes (DPDP)
-   - document photo upload with extraction (Groq vision, with a local OCR fallback), plus an optional DigiLocker pull
+   - document photo upload with extraction by **our own OCR** (documents are never sent to an LLM), plus an optional DigiLocker pull
    - live mock GSTIN and Udyam registry lookups, and a GSTIN checksum
    - cross-document checks
 4. **e-Sign & tracker**: OTP e-sign, an installation slot, a live order timeline, WhatsApp-style updates, and "ask about my order".
@@ -32,7 +32,7 @@ Accel Telecom is fictional and all data is synthetic (see [data/README.md](data/
 - **Backend**: FastAPI, with the onboarding journey as a **LangGraph** `StateGraph`. The graph uses interrupts and a Postgres or SQLite checkpointer.
 - **LLM**: Groq via a cooldown-aware `ModelRouter`.
   - Chat rotates through `gpt-oss-120b → qwen3-32b → llama-3.3-70b → gpt-oss-20b`.
-  - Documents use `llama-4-scout` vision.
+  - Documents are **not** sent to Groq. They are read by our OCR service (`ocr_service/`, a Hugging Face Space), or by local OCR when it's installed.
   - Input screening uses `llama-prompt-guard-2-86m`.
   - Voice uses `whisper-large-v3-turbo`.
   - With no key, everything still works on rules plus local OCR.

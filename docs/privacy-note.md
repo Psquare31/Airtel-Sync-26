@@ -26,7 +26,7 @@ Each purpose shows what is used, why, and how long it is kept. Every grant is wr
 
 **5. What leaves our boundary (processors).**
 - Before chat text reaches the LLM, a redactor strips GSTIN, PAN, Udyam, Aadhaar-like numbers, phone numbers and emails.
-- Only document images go to the vision model. That transfer is named in the consent notice, and the processor contract must prohibit retention and training.
+- **Document images never go to an LLM provider.** They are read by our own OCR service, hosted on Hugging Face as plain infrastructure. It runs our code, needs a secret key on every request, and processes images in memory without storing or logging them.
 - Voice audio is sent once for transcription and is not stored.
 - Prompt Guard screens inputs for injection attempts.
 

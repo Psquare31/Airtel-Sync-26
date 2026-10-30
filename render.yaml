@@ -25,6 +25,10 @@ services:
         value: "true"
       - key: LOCAL_OCR
         value: "false"
+      - key: OCR_SERVICE_URL
+        sync: false
+      - key: OCR_SERVICE_KEY
+        sync: false
   - type: web
     name: udyam-api-dev
     runtime: docker
@@ -49,3 +53,7 @@ services:
         value: "true"
       - key: LOCAL_OCR
         value: "false"
+      - key: OCR_SERVICE_URL
+        sync: false
+      - key: OCR_SERVICE_KEY
+        sync: false

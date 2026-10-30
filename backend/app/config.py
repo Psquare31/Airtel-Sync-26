@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     backoffice_key: str = "demo"
     # local RapidOCR fallback peaks near 500 MB; switch off on 512 MB instances
     local_ocr: bool = True
+    # our own OCR service (ocr_service/, e.g. on a Hugging Face Space) used when local OCR is off
+    ocr_service_url: str = ""
+    ocr_service_key: str = ""
+    # sends KYC images to the Groq vision model; off by default for data-protection reasons
+    kyc_vision: bool = False
 
     @property
     def ocr_enabled(self) -> bool:

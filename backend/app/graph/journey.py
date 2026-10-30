@@ -28,7 +28,7 @@ from app.services.rules_engine import recommend
 
 log = logging.getLogger("journey")
 
-CONSENT_VERSION = "2026-10-v2"
+CONSENT_VERSION = "2026-10-v3"
 
 
 class JourneyState(TypedDict, total=False):
@@ -172,8 +172,9 @@ CONSENT_PURPOSES = {
     "kyc_verification": {
         "required": True,
         "title": "Verify your business",
-        "text": "We check your GSTIN/Udyam with government registries and read the documents you upload. "
-                "Images are deleted right after reading; we keep only the extracted details.",
+        "text": "We check your GSTIN/Udyam with government registries and read the documents you upload with our "
+                "own document reader. Images are never sent to an AI company and are deleted right after reading; "
+                "we keep only the extracted details.",
         "retention": "Extracted details kept for the life of your account + 8 years (telecom licence rule); images: not stored.",
     },
     "service_activation": {
@@ -201,7 +202,9 @@ CONSENT_PURPOSES = {
 def consent_node(state: JourneyState) -> dict:
     _touch(state, stage="consent")
     answer = interrupt({"kind": "consent", "version": CONSENT_VERSION, "purposes": CONSENT_PURPOSES,
-                        "processors": ["Accel Telecom (data fiduciary)", "Groq Inc. (AI document reading, no retention)",
+                        "processors": ["Accel Telecom (data fiduciary)",
+                                       "Accel document reader on Hugging Face hosting (images processed in memory, not stored)",
+                                       "Groq Inc. (advisor chat only, ID numbers and contacts removed; never documents)",
                                        "Mock GST & Udyam registries"],
                         "grievance": "privacy@accelbusiness.example · Grievance officer responds within 7 days"})
     answer = answer if isinstance(answer, dict) else {}
