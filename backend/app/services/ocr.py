@@ -103,34 +103,38 @@ def _prepare(image_bytes: bytes, max_width: int = 1100) -> Image.Image:
     return img
 
 
-def _strip_watermark(img: Image.Image) -> np.ndarray:
+def _text_mask(img: Image.Image) -> np.ndarray:
+    """Binary image (0 = ink) with the pink watermark removed."""
     # int16, not int64: this runs on a 512 MB instance
     arr = np.asarray(img).astype(np.int16)
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     text = (arr.max(axis=2) < 150) | ((r - g < 40) & (r < 200) & (g < 200) & (b < 200))
     del arr, r, g, b
-    out = np.where(text, 0, 255).astype(np.uint8)
-    del text
+    return np.where(text, 0, 255).astype(np.uint8)
+
+
+def _strip_watermark(img: Image.Image) -> np.ndarray:
+    out = _text_mask(img)
     angle = _skew_angle(out)
     if abs(angle) >= 0.4:
         out = np.asarray(Image.fromarray(out).rotate(angle, resample=Image.BILINEAR, fillcolor=255, expand=False))
         out = np.where(out < 128, 0, 255).astype(np.uint8)
-    return np.stack([_crop_content(out)] * 3, axis=-1)
+    return np.stack([out[: _content_bottom(out)]] * 3, axis=-1)
 
 
-def _crop_content(binary: np.ndarray) -> np.ndarray:
-    """Keeps the text block at the top: drops empty page and a lone footer after a big gap.
-    OCR time and memory scale with area."""
+def _content_bottom(binary: np.ndarray) -> int:
+    """Last row of the text block at the top; drops empty page and a lone footer after a big gap.
+    OCR time/memory and vision tokens scale with area."""
     # > 8 dark pixels: ignores page-border lines and watermark specks that run down every row
     rows = np.where((binary == 0).sum(axis=1) > 8)[0]
     if not len(rows):
-        return binary
+        return binary.shape[0]
     gaps = np.diff(rows)
     cut = rows.max() + 20
     big = np.where(gaps > binary.shape[0] * 0.25)[0]
     if len(big):
         cut = rows[big[0]] + 20
-    return binary[: min(binary.shape[0], cut)]
+    return int(min(binary.shape[0], cut))
 
 
 def _skew_angle(binary: np.ndarray) -> float:
@@ -307,13 +311,16 @@ def _crosscheck_ids(data: dict, image_bytes: bytes, doc_type: str) -> None:
         data["extractor"] += " + ocr-check"
 
 
-VISION_WAIT_S = 20  # wait out a short rate-limit rather than run the heavier local OCR
+VISION_WAIT_S = 45  # wait out a rate-limit rather than run the heavier local OCR
 
 
 def _vision(image_bytes: bytes, doc_type: str) -> dict:
-    img = _prepare(image_bytes, max_width=1240)
+    img = _prepare(image_bytes, max_width=1024)
+    bottom = _content_bottom(_text_mask(img))
+    if bottom < img.height:  # fewer pixels, fewer tokens, more documents per rate-limit window
+        img = img.crop((0, 0, img.width, bottom))
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=88)
+    img.save(buf, format="JPEG", quality=85)
     fields_spec = ", ".join(f'"{f}": ""' for f in FIELDS.get(doc_type, []))
     data, info = get_router().vision_json(
         VISION_PROMPT.format(fields=fields_spec, doc_type=doc_type), buf.getvalue(), "image/jpeg"

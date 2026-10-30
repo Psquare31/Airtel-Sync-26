@@ -102,3 +102,16 @@ def test_reader_busy_when_vision_down_and_local_ocr_off(monkeypatch):
     ext = ocr.extract(data, "signatory_id")
     checks = kyc.document_checks("signatory_id", ext, data)
     assert ext["extractor"] == "unavailable" and checks[0].id == "reader_busy"
+
+
+def test_busy_document_only_asks_for_retry():
+    busy = {"fields": {}, "detected_type": None, "checks": [
+        {"id": "reader_busy", "status": "fail", "message": "busy", "doc": "address_proof"}]}
+    res = verify({
+        "gst_certificate": gst("19EOGXH4115Y1ZL", "Joseph Shah (Prop. Harmony Dental Care)", "Harmony Dental Care",
+                               address=K02_ADDR),
+        "signatory_id": sig("Joseph Shah", "Owner", "Harmony Dental Care"),
+        "address_proof": busy,
+    })
+    assert res["outcome"] == "fixable"
+    assert {c["id"] for c in res["checks"] if c["status"] == "fail"} == {"reader_busy"}

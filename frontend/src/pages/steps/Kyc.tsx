@@ -183,10 +183,14 @@ function DocCard({ label, optional, doc, failed, working, onFile }: {
           <p className="font-medium">
             {label} {optional && <span className="text-xs text-muted">({t('optionalDoc')})</span>}
           </p>
-          {doc && (
-            <p className="truncate text-xs text-muted">
-              {doc.source === 'digilocker' ? 'DigiLocker · issuer-verified' : `Read by ${doc.extractor}`}
-            </p>
+          {working ? (
+            <p className="text-xs text-muted">Reading your document… this can take up to 30 seconds</p>
+          ) : (
+            doc && (
+              <p className="truncate text-xs text-muted">
+                {doc.source === 'digilocker' ? 'DigiLocker · issuer-verified' : `Read by ${doc.extractor}`}
+              </p>
+            )
           )}
         </div>
         <label className="btn btn-ghost cursor-pointer px-3 py-1.5 text-sm">

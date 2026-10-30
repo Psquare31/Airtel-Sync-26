@@ -124,7 +124,7 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
 
     # an unreadable photo already asks for a retake; don't pile field errors on top
     unreadable = {t for t, d in docs.items()
-                  if any(c.get("id") in ("image_quality", "legible") and c.get("status") == FAIL for c in d.get("checks", []))}
+                  if any(c.get("id") in ("image_quality", "legible", "reader_busy") and c.get("status") == FAIL for c in d.get("checks", []))}
 
     # --- GSTIN
     gstin_raw = _get(docs, "gst_certificate", "gstin") or declared.get("gstin", "")
@@ -168,7 +168,7 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
 
     # --- Udyam (optional, but if uploaded it must be valid)
     udyam_rec = None
-    if "udyam_certificate" in docs:
+    if "udyam_certificate" in docs and "udyam_certificate" not in unreadable:
         number = v.normalize_id(_get(docs, "udyam_certificate", "udyam_number"))
         problems = v.validate_udyam(number)
         if problems:
@@ -198,7 +198,7 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
     legal_name = (gst_rec or {}).get("legal_name") or _get(docs, "gst_certificate", "legal_name")
 
     # --- Signatory
-    if "signatory_id" in docs:
+    if "signatory_id" in docs and "signatory_id" not in unreadable:
         name = _get(docs, "signatory_id", "name")
         role = _get(docs, "signatory_id", "designation").lower().strip()
         for_business = _get(docs, "signatory_id", "business_name")
@@ -222,7 +222,7 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
                 checks.append(Check("signatory_role", PASS, f"{role.title()} is an authorised signing role.", "signatory_id"))
 
     # --- Address proof
-    if "address_proof" in docs:
+    if "address_proof" in docs and "address_proof" not in unreadable:
         bill_date = v.parse_date(_get(docs, "address_proof", "bill_date"))
         if not bill_date:
             checks.append(Check("address_date", FAIL, "We couldn't read the bill date on the address proof.", "address_proof"))
