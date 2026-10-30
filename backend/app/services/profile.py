@@ -6,6 +6,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.services.cities import resolve as resolve_city
+from app.services.cities import tier_for
+
 Segment = Literal["micro", "prof", "multi", "mfg"]
 
 NEEDS = {
@@ -29,18 +32,6 @@ NEEDS = {
     "central_mgmt": "One dashboard for all sites",
     "iot_machines": "Machine monitoring",
     "fleet": "Vehicle tracking",
-}
-
-TIER1_CITIES = {
-    "mumbai", "delhi", "new delhi", "bengaluru", "bangalore", "chennai", "kolkata", "hyderabad",
-    "pune", "ahmedabad", "gurugram", "gurgaon", "noida", "navi mumbai", "thane",
-}
-TIER2_CITIES = {
-    "kochi", "ludhiana", "nagpur", "jaipur", "visakhapatnam", "vizag", "lucknow", "bhopal", "surat",
-    "mysuru", "mysore", "coimbatore", "indore", "nashik", "vadodara", "patna", "chandigarh",
-    "kanpur", "agra", "varanasi", "madurai", "rajkot", "amritsar", "bhubaneswar", "guwahati",
-    "dehradun", "ranchi", "raipur", "thiruvananthapuram", "mangaluru", "vijayawada", "jodhpur",
-    "gwalior", "jabalpur", "aurangabad", "meerut", "faridabad", "ghaziabad", "hubli", "trichy",
 }
 
 BUSINESS_TYPE_SEGMENTS: list[tuple[str, Segment]] = [
@@ -82,17 +73,12 @@ def business_phrase(text: str) -> str | None:
     return None
 
 
-def city_tier(city: str | None, known: dict[str, int] | None = None) -> int | None:
-    if not city:
-        return None
-    c = city.strip().lower()
-    if known and c in known:
-        return known[c]
-    if c in TIER1_CITIES:
-        return 1
-    if c in TIER2_CITIES:
-        return 2
-    return None
+PLACEHOLDERS = {"?", "??", "-", "n/a", "na", "unknown", "not known", "not sure", "tbd", "null", "none given"}
+
+
+def _placeholder(value) -> bool:
+    """Models sometimes fill a slot they haven't heard with '?' or 'unknown'."""
+    return isinstance(value, str) and value.strip().lower() in PLACEHOLDERS
 
 
 class Profile(BaseModel):
@@ -120,7 +106,7 @@ class Profile(BaseModel):
     def merge(self, updates: dict) -> "Profile":
         data = self.model_dump()
         for key, value in (updates or {}).items():
-            if key not in data or value in (None, "", []):
+            if key not in data or value in (None, "", []) or _placeholder(value):
                 continue
             if key == "needs":
                 value = [n for n in value if n in NEEDS]
@@ -139,6 +125,13 @@ class Profile(BaseModel):
                     pass
         if not merged.segment:
             merged.segment = guess_segment(merged.business_type, merged.sites, merged.employees)
+        if merged.city:
+            # any named city counts: known lists, then the model's tier, then tier 2 unless it's a small town
+            hit = resolve_city(merged.city)
+            if hit:
+                merged.city, merged.city_tier = hit
+            else:
+                merged.city_tier = tier_for(merged.city, merged.city_tier)
         return merged
 
     def missing(self) -> list[str]:

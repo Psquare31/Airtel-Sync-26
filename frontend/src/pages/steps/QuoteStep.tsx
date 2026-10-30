@@ -1,6 +1,7 @@
 import { Check, Lock, Minus, Pencil, Phone, Plus, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { inr } from '../../i18n'
+import { PlanFeedback } from '../../components/PlanFeedback'
 import type { Quote, QuoteItem } from '../../types'
 import type { StepProps } from '../JourneyPage'
 
@@ -30,6 +31,7 @@ export default function QuoteStep({ journey, resume, busy }: StepProps) {
             {n}
           </p>
         ))}
+        <PlanFeedback journeyId={journey.journey_id} />
       </section>
 
       <section className="flex flex-col gap-2">

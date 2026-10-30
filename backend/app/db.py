@@ -80,6 +80,34 @@ class LeadAction(SQLModel, table=True):
     created_at: datetime = Field(default_factory=now)
 
 
+class Feedback(SQLModel, table=True):
+    """Owner's 👍/👎 on the plan. Holds no personal data on its own."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    journey_id: str = Field(index=True)
+    stage: str = "quote"
+    rating: int  # +1 / -1
+    reason: str | None = None
+    comment: str | None = None
+    created_at: datetime = Field(default_factory=now)
+
+
+class LearnedTurn(SQLModel, table=True):
+    """One redacted advisor turn and the answers taken from it. Stored only with the
+    'improvement' consent; used as prompt examples and as test-case material."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    journey_id: str = Field(index=True)
+    lang: str = Field(index=True)
+    user_text: str
+    updates: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    segment: str | None = None
+    model: str | None = None
+    flagged: bool = False  # owner gave the plan a thumbs-down
+    created_at: datetime = Field(default_factory=now)
+    purge_after: datetime | None = None
+
+
 class AuditLog(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     at: datetime = Field(default_factory=now)

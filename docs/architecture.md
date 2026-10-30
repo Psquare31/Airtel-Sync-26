@@ -75,6 +75,19 @@ graph TD
   esign -.-> order --> stop
 ```
 
+## Improvement loop
+
+The advisor improves from consented real use, without retraining a model:
+
+| Signal | What it improves |
+|---|---|
+| Redacted advisor turns, kept with the optional "improve the advisor" consent | Similar past turns in the same language are added to the prompt as examples of how answers map to slots |
+| 👍/👎 on the plan, with a reason | 👎 conversations are left out of prompt examples and exported as draft test cases for review (`/api/backoffice/learning/scenarios.yaml`) |
+| Reviewed draft test cases (`tests/learned_scenarios.yaml`) | Run with the advisor scenario suite, so a fixed mistake can't come back |
+| Journey outcomes (ordered, handed off, or idle for a week) | The lead propensity model retrains on them with the historic leads, every 6 hours or on demand |
+
+Fine-tuning a small Indic model on this data is a later step, once there is real volume.
+
 ## Key design choices
 
 | Choice | Why |

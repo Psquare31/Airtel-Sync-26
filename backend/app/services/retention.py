@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from sqlmodel import select
 
-from app.db import ConsentRecord, Journey, KycDocument, audit, now, session
+from app.db import ConsentRecord, Journey, KycDocument, LearnedTurn, audit, now, session
 
 log = logging.getLogger("retention")
 
@@ -36,6 +36,12 @@ def purge_expired() -> dict:
             if purge_after and purge_after < t and doc.journey_id not in ordered:
                 s.delete(doc)
                 removed_docs += 1
+        for turn in s.exec(select(LearnedTurn)).all():
+            purge_after = turn.purge_after
+            if purge_after and purge_after.tzinfo is None:
+                purge_after = purge_after.replace(tzinfo=t.tzinfo)
+            if purge_after and purge_after < t:
+                s.delete(turn)
         stale = []
         for j in s.exec(select(Journey).where(Journey.order_id.is_(None))).all():
             updated = j.updated_at if j.updated_at.tzinfo else j.updated_at.replace(tzinfo=t.tzinfo)
@@ -68,6 +74,9 @@ def withdraw(journey_id: str, purposes: list[str]) -> dict:
             if not any(updated.values()):
                 rec.withdrawn_at = now()
             s.add(rec)
+        if "improvement" in purposes:
+            for turn in s.exec(select(LearnedTurn).where(LearnedTurn.journey_id == journey_id)).all():
+                s.delete(turn)
         if "kyc_verification" in purposes:
             for doc in s.exec(select(KycDocument).where(KycDocument.journey_id == journey_id)).all():
                 s.delete(doc)

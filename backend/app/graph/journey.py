@@ -20,7 +20,7 @@ from sqlmodel import select
 from app.config import ROOT, get_settings
 from app.db import ConsentRecord, Journey, KycDocument, audit, now, session
 from app.services import kyc as kyc_service
-from app.services import orders
+from app.services import learning, orders
 from app.services.advisor import advisor_turn, explain, q
 from app.services.pricing import price_quote
 from app.services.profile import Profile
@@ -28,7 +28,7 @@ from app.services.rules_engine import recommend
 
 log = logging.getLogger("journey")
 
-CONSENT_VERSION = "2026-10-v1"
+CONSENT_VERSION = "2026-10-v2"
 
 
 class JourneyState(TypedDict, total=False):
@@ -49,6 +49,8 @@ class JourneyState(TypedDict, total=False):
     order_id: str | None
     handoff: dict | None
     last_model: str | None
+    # redacted per-turn slot updates; written to the DB only with the 'improvement' consent
+    turn_log: Annotated[list[dict], operator.add]
 
 
 # ------------------------------------------------------------------ helpers
@@ -98,6 +100,9 @@ def advisor(state: JourneyState) -> dict:
                      {"role": "assistant", "content": result["reply"], "model": result["model"]}],
         "last_model": result["model"],
     }
+    entry = learning.turn_entry(text, prof.model_dump(), new_prof.model_dump(), result["model"])
+    if entry:
+        out["turn_log"] = [entry]
     if result["intent"] == "wants_human":
         out["handoff"] = _handoff(state, "customer_requested_callback", "Owner asked to speak to a person during the advisor chat.")
     _touch(state, segment=new_prof.segment, business_name=new_prof.business_name or new_prof.business_type,
@@ -183,6 +188,13 @@ CONSENT_PURPOSES = {
         "text": "Occasional WhatsApp/SMS offers for your business. You can stop any time.",
         "retention": "Until you withdraw.",
     },
+    "improvement": {
+        "required": False,
+        "title": "Help improve the advisor (optional)",
+        "text": "Keep your chat answers, with numbers and contact details removed, so the advisor learns to "
+                "understand businesses like yours. Never used for marketing or shared.",
+        "retention": "12 months, or until you withdraw.",
+    },
 }
 
 
@@ -206,6 +218,9 @@ def consent_node(state: JourneyState) -> dict:
         s.refresh(rec)
         cid = rec.id
     audit("owner", "consent_granted", state["journey_id"], purposes=purposes, version=CONSENT_VERSION)
+    if purposes.get("improvement") and state.get("turn_log"):
+        learning.persist(state["journey_id"], state.get("lang", "en"), (state.get("profile") or {}).get("segment"),
+                         state["turn_log"])
     return {"consent": {"granted": True, "purposes": purposes, "id": cid, "version": CONSENT_VERSION}, "stage": "kyc"}
 
 
