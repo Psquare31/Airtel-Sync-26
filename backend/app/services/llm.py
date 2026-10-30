@@ -120,6 +120,13 @@ class ModelRouter:
             self._cooldowns[model] = time.monotonic() + max(seconds, 1.0)
         log.warning("model %s cooling down for %.0fs", model, seconds)
 
+    def soonest_free(self, models: list[str]) -> float | None:
+        """Seconds until the first of these models leaves cooldown (0 if one is free)."""
+        now = time.monotonic()
+        with self._lock:
+            waits = [max(0.0, self._cooldowns.get(m, 0) - now) for m in models]
+        return min(waits) if waits else None
+
     def status(self, models: list[str]) -> list[dict]:
         now = time.monotonic()
         with self._lock:

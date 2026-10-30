@@ -52,7 +52,7 @@ def sharpness(image_bytes: bytes) -> float:
     im = Image.open(io.BytesIO(image_bytes)).convert("L")
     if im.width > 1100:
         im = im.resize((1100, int(im.height * 1100 / im.width)))
-    a = np.asarray(im).astype(float)
+    a = np.asarray(im).astype(np.float32)
     lap = a[1:-1, 1:-1] * -4 + a[:-2, 1:-1] + a[2:, 1:-1] + a[1:-1, :-2] + a[1:-1, 2:]
     return float(lap.var())
 
@@ -68,6 +68,8 @@ def repair_gstin(raw: str) -> tuple[str, bool]:
             fixed.append(_TO_DIGIT.get(ch, ch))
         elif kind == "L":
             fixed.append(_TO_LETTER.get(ch, ch))
+        elif kind == "Z":  # the 14th character is always 'Z'
+            fixed.append("Z" if ch in "Z2" else ch)
         else:
             fixed.append(ch)
     candidate = "".join(fixed)
@@ -85,6 +87,8 @@ def document_checks(doc_type: str, extraction: dict, image_bytes: bytes | None =
     """Checks that need only the one document."""
     label = DOC_LABELS.get(doc_type, doc_type)
     checks: list[Check] = []
+    if extraction.get("extractor") == "unavailable":
+        return [Check("reader_busy", FAIL, f"Our document reader is busy right now. Please upload the {label} again in a minute.", doc_type)]
     if image_bytes is not None:
         s = sharpness(image_bytes)
         if s < BLUR_THRESHOLD:

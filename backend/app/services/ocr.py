@@ -8,11 +8,14 @@ from __future__ import annotations
 import io
 import logging
 import re
+import threading
+import time
 
 import numpy as np
 from PIL import Image
 from rapidfuzz import fuzz
 
+from app.config import get_settings
 from app.services.llm import LLMUnavailable, get_router
 
 log = logging.getLogger("ocr")
@@ -101,19 +104,33 @@ def _prepare(image_bytes: bytes, max_width: int = 1100) -> Image.Image:
 
 
 def _strip_watermark(img: Image.Image) -> np.ndarray:
-    arr = np.asarray(img).astype(int)
+    # int16, not int64: this runs on a 512 MB instance
+    arr = np.asarray(img).astype(np.int16)
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
-    text = (np.maximum(np.maximum(r, g), b) < 150) | ((r - g < 40) & (r < 200) & (g < 200) & (b < 200))
+    text = (arr.max(axis=2) < 150) | ((r - g < 40) & (r < 200) & (g < 200) & (b < 200))
+    del arr, r, g, b
     out = np.where(text, 0, 255).astype(np.uint8)
+    del text
     angle = _skew_angle(out)
     if abs(angle) >= 0.4:
         out = np.asarray(Image.fromarray(out).rotate(angle, resample=Image.BILINEAR, fillcolor=255, expand=False))
         out = np.where(out < 128, 0, 255).astype(np.uint8)
-    # crop the empty lower part of the page: OCR time scales with area
-    rows = np.where((out == 0).sum(axis=1) > 2)[0]
-    if len(rows):
-        out = out[: min(out.shape[0], rows.max() + 20)]
-    return np.stack([out] * 3, axis=-1)
+    return np.stack([_crop_content(out)] * 3, axis=-1)
+
+
+def _crop_content(binary: np.ndarray) -> np.ndarray:
+    """Keeps the text block at the top: drops empty page and a lone footer after a big gap.
+    OCR time and memory scale with area."""
+    # > 8 dark pixels: ignores page-border lines and watermark specks that run down every row
+    rows = np.where((binary == 0).sum(axis=1) > 8)[0]
+    if not len(rows):
+        return binary
+    gaps = np.diff(rows)
+    cut = rows.max() + 20
+    big = np.where(gaps > binary.shape[0] * 0.25)[0]
+    if len(big):
+        cut = rows[big[0]] + 20
+    return binary[: min(binary.shape[0], cut)]
 
 
 def _skew_angle(binary: np.ndarray) -> float:
@@ -129,6 +146,8 @@ def _skew_angle(binary: np.ndarray) -> float:
 
 
 _engine = None
+# one OCR at a time: two concurrent runs would not fit the free-tier memory
+_ocr_lock = threading.Lock()
 
 
 def _ocr_engine():
@@ -136,7 +155,9 @@ def _ocr_engine():
     if _engine is None:
         from rapidocr import RapidOCR
 
-        _engine = RapidOCR()
+        # we deskew ourselves, so the direction classifier is dead weight
+        _engine = RapidOCR(params={"Global.use_cls": False, "Global.log_level": "warning",
+                                   "EngineConfig.onnxruntime.intra_op_num_threads": 2})
     return _engine
 
 
@@ -175,7 +196,9 @@ def _match_label(text: str) -> str | None:
 def ocr_extract(image_bytes: bytes, doc_type: str) -> dict:
     img = _prepare(image_bytes)
     arr = _strip_watermark(img)
-    res = _ocr_engine()(arr)
+    with _ocr_lock:
+        res = _ocr_engine()(arr)
+    del arr
     if not res or not res.txts:
         return {"detected_type": "other", "title": "", "fields": {}, "legible": False, "notes": "No text found"}
     boxes = _boxes(res.boxes, res.txts)
@@ -267,6 +290,8 @@ def _id_invalid(doc_type: str, value: str) -> bool:
 def _crosscheck_ids(data: dict, image_bytes: bytes, doc_type: str) -> None:
     """Vision models occasionally misread long IDs; if the read fails validation,
     re-read it with local OCR and keep whichever passes."""
+    if not get_settings().local_ocr:
+        return
     key = ID_FIELDS.get(doc_type)
     value = (data["fields"].get(key) or "") if key else ""
     if not key or not value or not _id_invalid(doc_type, value):
@@ -282,27 +307,45 @@ def _crosscheck_ids(data: dict, image_bytes: bytes, doc_type: str) -> None:
         data["extractor"] += " + ocr-check"
 
 
+VISION_WAIT_S = 20  # wait out a short rate-limit rather than run the heavier local OCR
+
+
+def _vision(image_bytes: bytes, doc_type: str) -> dict:
+    img = _prepare(image_bytes, max_width=1240)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=88)
+    fields_spec = ", ".join(f'"{f}": ""' for f in FIELDS.get(doc_type, []))
+    data, info = get_router().vision_json(
+        VISION_PROMPT.format(fields=fields_spec, doc_type=doc_type), buf.getvalue(), "image/jpeg"
+    )
+    data.setdefault("fields", {})
+    data["fields"] = {k: (str(v).strip() if v is not None else "") for k, v in data["fields"].items()}
+    data["extractor"] = info.model
+    return data
+
+
 def extract(image_bytes: bytes, doc_type: str) -> dict:
     """Returns {detected_type, fields, legible, notes, extractor}."""
     router = get_router()
     if router.available():
-        try:
-            img = _prepare(image_bytes, max_width=1240)
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=88)
-            fields_spec = ", ".join(f'"{f}": ""' for f in FIELDS.get(doc_type, []))
-            data, info = router.vision_json(
-                VISION_PROMPT.format(fields=fields_spec, doc_type=doc_type), buf.getvalue(), "image/jpeg"
-            )
-            data.setdefault("fields", {})
-            data["fields"] = {k: (str(v).strip() if v is not None else "") for k, v in data["fields"].items()}
-            data["extractor"] = info.model
-            _crosscheck_ids(data, image_bytes, doc_type)
-            return data
-        except LLMUnavailable as err:
-            log.warning("vision unavailable, falling back to OCR: %s", err)
-        except Exception as err:  # noqa: BLE001
-            log.warning("vision extraction failed, falling back to OCR: %s", str(err)[:200])
+        for attempt in range(2):
+            try:
+                data = _vision(image_bytes, doc_type)
+                _crosscheck_ids(data, image_bytes, doc_type)
+                return data
+            except LLMUnavailable as err:
+                wait = router.soonest_free(get_settings().vision_models)
+                if attempt == 0 and wait is not None and wait <= VISION_WAIT_S:
+                    log.info("vision rate-limited, retrying in %.0fs", wait)
+                    time.sleep(wait + 0.5)
+                    continue
+                log.warning("vision unavailable, falling back to OCR: %s", err)
+            except Exception as err:  # noqa: BLE001
+                log.warning("vision extraction failed, falling back to OCR: %s", str(err)[:200])
+            break
+    if not get_settings().local_ocr:
+        return {"detected_type": None, "title": "", "fields": {}, "legible": None, "extractor": "unavailable",
+                "notes": "document reader busy"}
     data = ocr_extract(image_bytes, doc_type)
     data["extractor"] = "local-ocr"
     return data

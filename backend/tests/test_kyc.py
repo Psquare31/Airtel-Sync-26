@@ -91,3 +91,14 @@ def test_missing_documents():
     res = verify({"signatory_id": sig("A", "Owner", "B")})
     assert "missing_gst_certificate" in failed(res)
     assert res["outcome"] != "verified"
+
+
+def test_reader_busy_when_vision_down_and_local_ocr_off(monkeypatch):
+    from app.config import get_settings
+    from app.services import kyc, ocr
+
+    monkeypatch.setattr(get_settings(), "local_ocr", False)
+    data = (get_settings().data_dir / "kyc_documents" / "K02_signatory_id.png").read_bytes()
+    ext = ocr.extract(data, "signatory_id")
+    checks = kyc.document_checks("signatory_id", ext, data)
+    assert ext["extractor"] == "unavailable" and checks[0].id == "reader_busy"
