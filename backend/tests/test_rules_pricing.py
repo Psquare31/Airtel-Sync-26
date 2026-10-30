@@ -113,3 +113,9 @@ def test_setup_emi():
     p, rec = _rec(business_type="Kirana", employees=2, sites=1, city_tier=2, has_gstin=False, needs=["pos_billing"])
     q = price_quote(rec, p, setup_emi=True)
     assert q["setup_total"] == 2500 and q["setup_emi_monthly"] == 417
+
+
+def test_placeholder_slot_values_are_ignored():
+    p = Profile().merge({"current_internet": "?", "city": "unknown", "employees": 4})
+    assert p.current_internet is None and p.city is None and p.employees == 4
+    assert "current_internet" in p.missing()

@@ -47,3 +47,7 @@
 - name: a need for customer wifi is not mistaken for current tools
   messages: ["salon", "3", "1", "Indore", "no", "home broadband", "wifi for customers and cctv"]
   expect: {segment: micro, must_select: [P22, P23], reason: {P01: FROM_HOME_BB}}
+- name: hindi city and current tools in one go
+  lang: hi
+  messages: ["मेरा डेंटल क्लिनिक है कोलकाता में, 6 लोग काम करते हैं", "1 क्लिनिक", "हाँ GST है", "अभी मोबाइल हॉटस्पॉट इस्तेमाल करते हैं", "ईमेल और डेटा बैकअप"]
+  expect: {segment: prof, must_select: [P16, P17], reason: {P02: FROM_HOTSPOT}}

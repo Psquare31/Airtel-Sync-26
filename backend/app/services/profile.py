@@ -95,6 +95,14 @@ def city_tier(city: str | None, known: dict[str, int] | None = None) -> int | No
     return None
 
 
+PLACEHOLDERS = {"?", "??", "-", "n/a", "na", "unknown", "not known", "not sure", "tbd", "null", "none given"}
+
+
+def _placeholder(value) -> bool:
+    """Models sometimes fill a slot they haven't heard with '?' or 'unknown'."""
+    return isinstance(value, str) and value.strip().lower() in PLACEHOLDERS
+
+
 class Profile(BaseModel):
     business_name: str | None = None
     business_type: str | None = None
@@ -120,7 +128,7 @@ class Profile(BaseModel):
     def merge(self, updates: dict) -> "Profile":
         data = self.model_dump()
         for key, value in (updates or {}).items():
-            if key not in data or value in (None, "", []):
+            if key not in data or value in (None, "", []) or _placeholder(value):
                 continue
             if key == "needs":
                 value = [n for n in value if n in NEEDS]
