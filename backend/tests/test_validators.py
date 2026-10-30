@@ -30,6 +30,7 @@ def test_bad_length_and_state():
 def test_repair_ocr_zero_for_o():
     fixed, changed = repair_gstin("19E0GXH4115Y1ZL")
     assert changed and fixed == "19EOGXH4115Y1ZL"
+    assert repair_gstin("19E0GXH4115Y12L") == ("19EOGXH4115Y1ZL", True)  # Z read as 2
     fixed, _ = repair_gstin("08YKZXS8189L1Z0")  # a real alteration stays invalid
     assert validate_gstin(fixed)
 

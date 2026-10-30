@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     address_proof_max_age_days: int = 90
     demo_mode: bool = True
     backoffice_key: str = "demo"
+    # local RapidOCR fallback peaks near 500 MB; switch off on 512 MB instances
+    local_ocr: bool = True
 
     @property
     def chat_models(self) -> list[str]:

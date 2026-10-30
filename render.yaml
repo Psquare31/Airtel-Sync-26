@@ -23,6 +23,8 @@ services:
         generateValue: true
       - key: DEMO_MODE
         value: "true"
+      - key: LOCAL_OCR
+        value: "false"
   - type: web
     name: udyam-api-dev
     runtime: docker
@@ -45,3 +47,5 @@ services:
         value: demo
       - key: DEMO_MODE
         value: "true"
+      - key: LOCAL_OCR
+        value: "false"
