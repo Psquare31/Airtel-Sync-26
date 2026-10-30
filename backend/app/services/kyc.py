@@ -170,6 +170,9 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
     udyam_rec = None
     if "udyam_certificate" in docs and "udyam_certificate" not in unreadable:
         number = v.normalize_id(_get(docs, "udyam_certificate", "udyam_number"))
+        typed = v.normalize_id(declared.get("udyam_number"))
+        if typed and number and typed != number:
+            checks.append(Check("udyam_declared", FAIL, "The Udyam number you typed doesn't match the certificate.", "udyam_certificate"))
         problems = v.validate_udyam(number)
         if problems:
             checks.append(Check("udyam_format", FAIL, problems[0] + " on the Udyam certificate.", "udyam_certificate"))
@@ -190,6 +193,10 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
                         checks.append(Check("udyam_vs_gst", FAIL, "Udyam enterprise name doesn't match the GST trade name.", "udyam_certificate"))
                     if v.udyam_state(number) and v.udyam_state(number) != gst_rec["state"]:
                         checks.append(Check("udyam_state", WARN, "Udyam and GST registrations are in different states.", "udyam_certificate"))
+    elif gst_rec and (reg := _registered_udyam(gst_rec)):
+        checks.append(Check("missing_udyam_certificate", FAIL,
+                            f"Your business is Udyam-registered ({v.mask(reg['udyam_number'], 6, 3)}). "
+                            "Please upload the Udyam certificate.", "udyam_certificate"))
     elif declared.get("has_udyam"):
         checks.append(Check("missing_udyam_certificate", WARN, "You mentioned a Udyam registration; uploading it can unlock MSME offers.", "udyam_certificate"))
 
@@ -265,6 +272,16 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
         "constitution": constitution,
         "gstin_masked": v.mask(v.normalize_id(gstin_raw)) if gstin_raw else "",
     }
+
+
+def _registered_udyam(gst_rec: dict) -> dict | None:
+    """Udyam record for the same business (trade name + state), if the registry has one."""
+    from app.data.loader import norm_name
+
+    for rec in get_dataset().udyam_by_name.get(norm_name(gst_rec["trade_name"]), []):
+        if rec["state"] == gst_rec["state"]:
+            return rec
+    return None
 
 
 def _dedupe(checks: list[Check]) -> list[Check]:

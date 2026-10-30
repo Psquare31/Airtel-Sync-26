@@ -41,5 +41,8 @@ def test_scenario(sc):
     assert set(exp.get("must_select", [])) <= chosen, chosen
     assert not set(exp.get("must_not_select", [])) & chosen
     assert set(exp.get("locked", [])) <= locked
+    codes = {l.product_id: l.reason_code for l in rec.lines}
+    for pid, code in exp.get("reason", {}).items():
+        assert codes.get(pid) == code, (pid, codes.get(pid))
     if "max_monthly" in exp:
         assert price_quote(rec, prof)["monthly_total"] <= exp["max_monthly"]

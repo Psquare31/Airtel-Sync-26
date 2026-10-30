@@ -24,7 +24,7 @@ def test_journey_flow_and_wrong_kind(client):
     r = client.post(f"/api/journeys/{jid}/resume", json={"value": {"kind": "quote", "action": "accept"}})
     assert r.status_code == 409
     j = client.post(f"/api/journeys/{jid}/resume", json={"value": {
-        "kind": "chat", "text": "Kirana store in Lucknow, 2 people, one shop, no GST, need UPI billing"}}).json()
+        "kind": "chat", "text": "Kirana store in Lucknow, 2 people, one shop, no GST, using mobile hotspot, need UPI billing"}}).json()
     assert j["pending"]["kind"] == "quote" and j["quote"]["monthly_total"] > 0
 
 

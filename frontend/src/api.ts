@@ -49,6 +49,7 @@ export const api = {
   withdraw: (id: string, purposes: string[]) =>
     post<{ withdrawn: string[]; documents_erased: number }>(`/api/journeys/${id}/consent/withdraw`, { purposes }),
   gstin: (g: string) => request<RegistryResult>(`/api/registry/gstin/${encodeURIComponent(g)}`),
+  udyam: (u: string) => request<UdyamResult>(`/api/registry/udyam/${encodeURIComponent(u)}`),
   order: (id: string) => request<OrderView>(`/api/orders/${id}`),
   advance: (id: string) => post<OrderView>(`/api/orders/${id}/advance`),
   ask: (id: string, question: string, lang: string) =>
@@ -81,6 +82,17 @@ export interface RegistryResult {
   status?: string
   state?: string
   constitution?: string
+}
+
+export interface UdyamResult {
+  valid_format: boolean
+  found: boolean
+  problems?: string[]
+  enterprise_name?: string
+  enterprise_type?: string
+  major_activity?: string
+  state?: string
+  city?: string
 }
 
 export interface Check {

@@ -236,7 +236,8 @@ def kyc_node(state: JourneyState) -> dict:
         return {"handoff": _handoff(state, "kyc_assist_requested", "Owner asked a partner to collect documents."),
                 "stage": "handoff"}
     docs = _load_docs(state["journey_id"])
-    declared = {"gstin": action.get("gstin", ""), "has_udyam": prof.get("has_udyam")}
+    declared = {"gstin": action.get("gstin", ""), "udyam_number": action.get("udyam_number", ""),
+                "has_udyam": prof.get("has_udyam")}
     result = kyc_service.verify(docs, declared)
     audit("system", "kyc_checked", state["journey_id"], outcome=result["outcome"],
           failed=[c["id"] for c in result["checks"] if c["status"] == "fail"])

@@ -5,8 +5,11 @@
   messages: ["मेरी किराना दुकान है", "2 लोग", "एक दुकान", "Lucknow", "नहीं", "UPI billing and whatsapp"]
   expect: {segment: micro, must_select: [P01, P07, P19], locked: [P15]}
 - name: dental clinic one-shot
-  messages: ["I run a dental clinic in Pune with 8 staff, 1 clinic, we have GST. Need email and data security"]
-  expect: {segment: prof, must_select: [P02, P16, P20]}
+  messages: ["I run a dental clinic in Pune with 8 staff, 1 clinic, we have GST, on home broadband today. Need email and data security"]
+  expect: {segment: prof, must_select: [P02, P16, P20], reason: {P02: FROM_HOME_BB}}
+- name: current tools question is asked and used
+  messages: ["kirana store", "2", "1", "Lucknow", "no", "just a mobile hotspot", "UPI billing"]
+  expect: {segment: micro, must_select: [P01, P19], reason: {P01: FROM_HOTSPOT}}
 - name: restaurant chain uptime
   messages: ["We are a restaurant chain", "45 employees", "6 outlets", "Bengaluru", "yes GST", "billing must never go down, also cctv"]
   expect: {segment: multi, must_select: [P09, P19, P23, P10]}
@@ -41,3 +44,6 @@
   lang: hi
   messages: ["मेरा CA ऑफिस है", "5 लोग", "1 ऑफिस", "Pune", "हाँ GST है", "ईमेल और डेटा बैकअप"]
   expect: {segment: prof, must_select: [P17, P16]}
+- name: a need for customer wifi is not mistaken for current tools
+  messages: ["salon", "3", "1", "Indore", "no", "home broadband", "wifi for customers and cctv"]
+  expect: {segment: micro, must_select: [P22, P23], reason: {P01: FROM_HOME_BB}}

@@ -29,6 +29,13 @@ const CHIPS: Record<string, { en: string; hi: string }[]> = {
     { en: 'Yes, I have GST', hi: 'हाँ, GST है' },
     { en: 'No GST yet', hi: 'GST नहीं है' },
   ],
+  current_internet: [
+    { en: 'Mobile hotspot', hi: 'मोबाइल हॉटस्पॉट' },
+    { en: 'Home broadband', hi: 'घर का ब्रॉडबैंड' },
+    { en: 'Business broadband', hi: 'बिज़नेस ब्रॉडबैंड' },
+    { en: 'Leased line', hi: 'लीज़्ड लाइन' },
+    { en: 'Nothing yet', hi: 'अभी कुछ नहीं' },
+  ],
   needs: [
     { en: 'Internet for UPI and billing', hi: 'UPI और बिलिंग के लिए इंटरनेट' },
     { en: 'WhatsApp for customers', hi: 'ग्राहकों के लिए WhatsApp' },
