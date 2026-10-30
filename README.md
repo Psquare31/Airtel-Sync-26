@@ -62,6 +62,8 @@ Back-office: http://localhost:5173/backoffice (key `demo` locally).
 ```bash
 cd backend && pytest -q                       # 55 tests: rules, pricing, router rotation, advisor scenarios, KYC, graph paths, API
 python -m scripts.kyc_batch --ocr             # runs Smart KYC on all 12 specimen applicants offline
+# requirements-dev.txt includes the optional local OCR stack (requirements-ocr.txt).
+# The Docker image leaves it out unless built with --build-arg WITH_OCR=true (needs > 512 MB RAM).
 ```
 
 Current offline KYC result on the specimen pack:

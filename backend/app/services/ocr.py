@@ -294,7 +294,7 @@ def _id_invalid(doc_type: str, value: str) -> bool:
 def _crosscheck_ids(data: dict, image_bytes: bytes, doc_type: str) -> None:
     """Vision models occasionally misread long IDs; if the read fails validation,
     re-read it with local OCR and keep whichever passes."""
-    if not get_settings().local_ocr:
+    if not get_settings().ocr_enabled:
         return
     key = ID_FIELDS.get(doc_type)
     value = (data["fields"].get(key) or "") if key else ""
@@ -350,7 +350,7 @@ def extract(image_bytes: bytes, doc_type: str) -> dict:
             except Exception as err:  # noqa: BLE001
                 log.warning("vision extraction failed, falling back to OCR: %s", str(err)[:200])
             break
-    if not get_settings().local_ocr:
+    if not get_settings().ocr_enabled:
         return {"detected_type": None, "title": "", "fields": {}, "legible": None, "extractor": "unavailable",
                 "notes": "document reader busy"}
     data = ocr_extract(image_bytes, doc_type)

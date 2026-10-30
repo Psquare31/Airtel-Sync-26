@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     local_ocr: bool = True
 
     @property
+    def ocr_enabled(self) -> bool:
+        """LOCAL_OCR is on and the optional OCR packages (requirements-ocr.txt) are installed."""
+        import importlib.util
+
+        return self.local_ocr and importlib.util.find_spec("rapidocr") is not None
+
+    @property
     def chat_models(self) -> list[str]:
         return _chain(self.groq_chat_models, DEFAULT_CHAT_MODELS)
 
