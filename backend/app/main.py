@@ -42,6 +42,7 @@ def health():
     return {
         "ok": True,
         "env": settings.env,
+        "db": "postgres" if settings.database_url else "sqlite",
         "llm_configured": router.available(),
         "models": router.status(settings.chat_models),
     }

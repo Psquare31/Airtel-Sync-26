@@ -252,6 +252,36 @@ def _join_wrapped(a: str, b: str) -> str:
     return f"{a} {b}"
 
 
+ID_FIELDS = {"gst_certificate": "gstin", "udyam_certificate": "udyam_number"}
+
+
+def _id_invalid(doc_type: str, value: str) -> bool:
+    from app.services.kyc import repair_gstin
+    from app.services.validators import validate_gstin, validate_udyam
+
+    if doc_type == "gst_certificate":
+        return bool(validate_gstin(repair_gstin(value)[0]))
+    return bool(validate_udyam(value))
+
+
+def _crosscheck_ids(data: dict, image_bytes: bytes, doc_type: str) -> None:
+    """Vision models occasionally misread long IDs; if the read fails validation,
+    re-read it with local OCR and keep whichever passes."""
+    key = ID_FIELDS.get(doc_type)
+    value = (data["fields"].get(key) or "") if key else ""
+    if not key or not value or not _id_invalid(doc_type, value):
+        return
+    try:
+        local = ocr_extract(image_bytes, doc_type)["fields"].get(key, "")
+    except Exception as err:  # noqa: BLE001
+        log.warning("OCR cross-check failed: %s", err)
+        return
+    if local and not _id_invalid(doc_type, local):
+        log.info("%s corrected by OCR cross-check", key)
+        data["fields"][key] = local
+        data["extractor"] += " + ocr-check"
+
+
 def extract(image_bytes: bytes, doc_type: str) -> dict:
     """Returns {detected_type, fields, legible, notes, extractor}."""
     router = get_router()
@@ -267,6 +297,7 @@ def extract(image_bytes: bytes, doc_type: str) -> dict:
             data.setdefault("fields", {})
             data["fields"] = {k: (str(v).strip() if v is not None else "") for k, v in data["fields"].items()}
             data["extractor"] = info.model
+            _crosscheck_ids(data, image_bytes, doc_type)
             return data
         except LLMUnavailable as err:
             log.warning("vision unavailable, falling back to OCR: %s", err)

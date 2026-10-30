@@ -51,14 +51,14 @@ def q(lang: str, key: str) -> str:
 
 # ------------------------------------------------------------------ parser
 NEED_KEYWORDS = [
-    (r"backup internet|failover|internet (goes|is) down|downtime|uptime|never go down|बैकअप", "backup_internet"),
+    (r"backup internet|failover|internet (goes|is) down|downtime|uptime|never go down|बैकअप इंटरनेट|इंटरनेट बैकअप", "backup_internet"),
     (r"leased line|dedicated|sla\b|erp", "dedicated_bandwidth"),
     (r"\bupi\b|\bpos\b|billing|bill(ing)? machine|invoice|card (payment|machine)|बिलिंग", "pos_billing"),
     (r"whats ?app|व्हाट्सएप", "whatsapp"),
     (r"\bsms\b|text message|reminder", "sms"),
     (r"website|domain|online presence|google par", "website"),
     (r"e-?mail|gmail|ईमेल", "email"),
-    (r"cloud backup|back ?up (files|data)|data backup|records? safe", "cloud_backup"),
+    (r"cloud backup|back ?up (files|data)|data back ?up|records? safe|डेटा बैकअप|डाटा बैकअप|फ़ाइल बैकअप", "cloud_backup"),
     (r"antivirus|virus|ransomware|device security|malware|data security|cyber", "device_security"),
     (r"firewall", "firewall"),
     (r"guest wi-?fi|customer wi-?fi|wi-?fi for (customers|guests|patients|students)|free wifi", "guest_wifi"),
@@ -83,7 +83,9 @@ NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "se
              "ten": 10, "ek": 1, "do": 2, "teen": 3, "char": 4, "paanch": 5, "just me": 1, "only me": 1,
              "alone": 1, "akela": 1, "single": 1}
 HINDI_BIZ = {"दुकान": "shop", "क्लिनिक": "clinic", "फैक्ट्री": "factory", "किराना": "kirana store",
-             "रेस्टोरेंट": "restaurant", "कोचिंग": "coaching centre", "सैलून": "salon", "फार्मेसी": "pharmacy"}
+             "रेस्टोरेंट": "restaurant", "कोचिंग": "coaching centre", "सैलून": "salon", "फार्मेसी": "pharmacy",
+             "ऑफिस": "office", "दफ़्तर": "office", "चेन": "chain", "ब्रांच": "branches", "यूनिट": "unit",
+             "दवाखाना": "clinic", "मेडिकल": "pharmacy", "बेकरी": "bakery"}
 
 
 def _hindi_int(text: str) -> int | None:
@@ -140,7 +142,7 @@ def parse_message(text: str, expecting: str | None, prof: Profile) -> dict:
         upd["employees"] = emp
 
     sites = _first_int(low, r"branch(?:es)?|stores?|outlets?|shops?|sites?|locations?|clinics?|centres?|centers?|units?|"
-                            r"offices?|factor(?:y|ies)|labs?|दुकान|ब्रांच")
+                            r"offices?|factor(?:y|ies)|labs?|दुकान|ब्रांच|ऑफिस|क्लिनिक|यूनिट")
     if sites is None and expecting == "sites":
         sites = _first_int(low) or _hindi_int(t) or (1 if re.search(r"\b(one|just one|single|ek|only)\b", low) else None)
     if sites:
@@ -214,7 +216,8 @@ Return ONLY JSON: {{"updates": {{...}}, "intent": "answer"|"out_of_scope"|"wants
  business_type (short text), segment ("micro" kirana/salon/pharmacy/single shop | "prof" clinic/CA/law/coaching/agency office |
  "multi" 3+ outlets/branches/chain | "mfg" factory/workshop/manufacturing unit), employees (int), sites (int),
  city (text), city_tier (1 metro, 2 other city, 3 small town/village), has_gstin (bool), has_udyam (bool),
- current_internet (text), needs (list from: {needs}), mobile_lines (int), cameras (int), pos_counters (int),
+ current_internet (text), needs (list from: {needs}; backup_internet = a second internet line for
+ when the main one fails, cloud_backup = backing up files/data), mobile_lines (int), cameras (int), pos_counters (int),
  devices (int), vehicles (int), machines (int), fibre_available (bool), budget_monthly (int rupees).
 CURRENT PROFILE: {profile}
 MISSING: {missing}"""
@@ -278,6 +281,10 @@ def advisor_turn(prof: Profile, history: list[dict], user_text: str, lang: str) 
                 if k in parsed:
                     updates.pop(k, None)
             prof = prof.merge(updates)
+            # tiers of known cities come from the data, not the model
+            known = city_tier(prof.city, get_dataset().city_tiers)
+            if known:
+                prof.city_tier = known
         if llm.get("intent") in ("wants_human", "out_of_scope"):
             intent = llm["intent"]
         reply = (llm.get("reply") or "").strip() or None
