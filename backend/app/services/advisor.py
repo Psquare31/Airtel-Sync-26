@@ -7,7 +7,9 @@ import re
 
 from app.data.loader import SEGMENT_NAMES, get_dataset
 from app.services.llm import LLMUnavailable, get_router, redact
-from app.services.profile import NEEDS, Profile, business_phrase, city_tier, guess_segment
+from app.services.cities import SMALL_TOWN, tier_for
+from app.services.cities import find_in_text as find_city
+from app.services.profile import NEEDS, Profile, business_phrase, guess_segment
 
 log = logging.getLogger("advisor")
 
@@ -89,11 +91,7 @@ HINDI_BIZ = {"दुकान": "shop", "क्लिनिक": "clinic", "फ�
              "ऑफिस": "office", "दफ़्तर": "office", "चेन": "chain", "ब्रांच": "branches", "यूनिट": "unit",
              "दवाखाना": "clinic", "मेडिकल": "pharmacy", "बेकरी": "bakery"}
 
-HINDI_CITIES = {"कोलकाता": "kolkata", "मुंबई": "mumbai", "दिल्ली": "delhi", "पुणे": "pune", "बेंगलुरु": "bengaluru",
-                "बैंगलोर": "bengaluru", "चेन्नई": "chennai", "हैदराबाद": "hyderabad", "अहमदाबाद": "ahmedabad",
-                "जयपुर": "jaipur", "लखनऊ": "lucknow", "नागपुर": "nagpur", "सूरत": "surat", "इंदौर": "indore",
-                "भोपाल": "bhopal", "पटना": "patna", "वडोदरा": "vadodara", "नासिक": "nashik", "कोच्चि": "kochi",
-                "लुधियाना": "ludhiana", "कोयंबटूर": "coimbatore", "मैसूर": "mysuru", "विशाखापत्तनम": "visakhapatnam"}
+
 
 CURRENT_TOOLS = [
     (r"leased line|dedicated line|ill\b|लीज़्ड|लीज्ड", "Leased line"),
@@ -152,7 +150,7 @@ def parse_message(text: str, expecting: str | None, prof: Profile, defaults: boo
     """Cheap deterministic extraction; also used as fallback when no LLM is available."""
     t = text.strip()
     low = t.lower()
-    for hi, en in {**HINDI_BIZ, **HINDI_CITIES}.items():
+    for hi, en in HINDI_BIZ.items():
         if hi in t:
             low += f" {en}"
     upd: dict = {}
@@ -181,18 +179,17 @@ def parse_message(text: str, expecting: str | None, prof: Profile, defaults: boo
     if upd.get("sites", 0) >= 3 and (prof.segment in ("micro", "prof") or upd.get("segment") in ("micro", "prof")):
         upd["segment"] = "multi"
 
-    ds = get_dataset()
-    for city in sorted(set(ds.city_tiers) | {"mumbai", "delhi", "bengaluru", "bangalore", "chennai",
-                                              "hyderabad", "pune", "kolkata", "ahmedabad"}, key=len, reverse=True):
-        if re.search(rf"\b{re.escape(city)}\b", low):
-            upd["city"] = city.title()
-            upd["city_tier"] = city_tier(city, ds.city_tiers)
-            break
-    if "city" not in upd and expecting == "city" and t:
-        name = re.sub(r"[^a-zA-Z .]", "", t).strip().title()[:40]
+    found = find_city(t, expecting_city=expecting == "city")
+    if found:
+        upd["city"] = found
+        upd["city_tier"] = tier_for(found)
+    elif expecting == "city" and t:
+        # an unknown town in any script: keep the name; tier comes from the model or defaults in Profile.merge
+        name = re.sub(r"[^\w .-]", "", t).strip()[:40]
         if name:
             upd["city"] = name
-            upd["city_tier"] = city_tier(name, ds.city_tiers) or (3 if re.search(r"village|gaon|town|tehsil", low) else 2)
+            if SMALL_TOWN.search(t):
+                upd["city_tier"] = 3
 
     if re.search(r"\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]\b", t.upper()):
         upd["has_gstin"] = True
@@ -257,7 +254,7 @@ Return ONLY JSON: {{"updates": {{...}}, "intent": "answer"|"out_of_scope"|"wants
 did not mention, or use placeholders like "?" or "unknown"; leave the key out instead:
  business_type (short text), segment ("micro" kirana/salon/pharmacy/single shop | "prof" clinic/CA/law/coaching/agency office |
  "multi" 3+ outlets/branches/chain | "mfg" factory/workshop/manufacturing unit), employees (int), sites (int),
- city (text), city_tier (1 metro, 2 other city, 3 small town/village), has_gstin (bool), has_udyam (bool),
+ city (English spelling, e.g. "Kolkata"), city_tier (1 metro, 2 other city, 3 small town/village), has_gstin (bool), has_udyam (bool),
  current_internet (text), needs (list from: {needs}; backup_internet = a second internet line for
  when the main one fails, cloud_backup = backing up files/data), mobile_lines (int), cameras (int), pos_counters (int),
  devices (int), vehicles (int), machines (int), fibre_available (bool), budget_monthly (int rupees).
@@ -329,10 +326,6 @@ def advisor_turn(prof: Profile, history: list[dict], user_text: str, lang: str) 
             if "current_internet" in updates and not _talks_about_current_tools(low, expecting):
                 updates.pop("current_internet")
             prof = prof.merge(updates)
-            # tiers of known cities come from the data, not the model
-            known = city_tier(prof.city, get_dataset().city_tiers)
-            if known:
-                prof.city_tier = known
             # the model answers in free text; recommendation reasons key off the canonical label
             if prof.current_internet:
                 prof.current_internet = _current_tools(prof.current_internet.lower()) or prof.current_internet

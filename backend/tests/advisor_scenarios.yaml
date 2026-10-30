@@ -51,3 +51,10 @@
   lang: hi
   messages: ["मेरा डेंटल क्लिनिक है कोलकाता में, 6 लोग काम करते हैं", "1 क्लिनिक", "हाँ GST है", "अभी मोबाइल हॉटस्पॉट इस्तेमाल करते हैं", "ईमेल और डेटा बैकअप"]
   expect: {segment: prof, must_select: [P16, P17], reason: {P02: FROM_HOTSPOT}}
+- name: tamil message with a city the dataset doesn't have
+  lang: ta
+  messages: ["kirana shop", "2", "1", "திருநெல்வேலி", "no", "mobile hotspot", "UPI billing"]
+  expect: {segment: micro, must_select: [P01, P19]}
+- name: city answered in bengali script
+  messages: ["CA office", "5", "1", "কলকাতা", "yes", "home broadband", "email"]
+  expect: {segment: prof, must_select: [P16]}
