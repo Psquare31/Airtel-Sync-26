@@ -202,7 +202,7 @@ class WithdrawBody(BaseModel):
 def withdraw_consent(jid: str, body: WithdrawBody):
     from app.services.retention import withdraw
 
-    allowed = {"kyc_verification", "service_activation", "marketing"}
+    allowed = {"kyc_verification", "service_activation", "marketing", "improvement"}
     return withdraw(jid, [p for p in body.purposes if p in allowed])
 
 
@@ -213,3 +213,20 @@ def list_documents(jid: str):
         return [{"doc_type": r.doc_type, "source": r.source, "extractor": r.extractor,
                  "fields": _public_fields(r.fields.get("fields", {})), "checks": r.fields.get("checks", [])}
                 for r in rows]
+
+
+class FeedbackBody(BaseModel):
+    rating: int
+    reason: str | None = None
+    comment: str | None = None
+    stage: str = "quote"
+
+
+@router.post("/{jid}/feedback")
+def feedback(jid: str, body: FeedbackBody):
+    """Owner's thumbs up/down on the plan; a thumbs-down flags the conversation for review."""
+    from app.services import learning
+
+    view(jid)
+    learning.record_feedback(jid, body.rating, body.reason, body.comment, body.stage)
+    return {"ok": True}

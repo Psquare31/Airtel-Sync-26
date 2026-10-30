@@ -46,6 +46,8 @@ export const api = {
   },
   digilocker: (id: string, gstin?: string, udyam_number?: string) =>
     post<{ documents: UploadResult[] }>(`/api/journeys/${id}/digilocker`, { gstin, udyam_number }),
+  feedback: (id: string, rating: number, reason?: string, comment?: string) =>
+    post<{ ok: boolean }>(`/api/journeys/${id}/feedback`, { rating, reason, comment }),
   withdraw: (id: string, purposes: string[]) =>
     post<{ withdrawn: string[]; documents_erased: number }>(`/api/journeys/${id}/consent/withdraw`, { purposes }),
   gstin: (g: string) => request<RegistryResult>(`/api/registry/gstin/${encodeURIComponent(g)}`),

@@ -8,7 +8,12 @@ from app.services.pricing import price_quote
 from app.services.profile import Profile
 from app.services.rules_engine import recommend
 
-SCENARIOS = yaml.safe_load((Path(__file__).parent / "advisor_scenarios.yaml").read_text(encoding="utf-8"))
+HERE = Path(__file__).parent
+SCENARIOS = yaml.safe_load((HERE / "advisor_scenarios.yaml").read_text(encoding="utf-8"))
+# reviewed scenarios exported from thumbs-down conversations (see /api/backoffice/learning/scenarios.yaml)
+LEARNED = HERE / "learned_scenarios.yaml"
+if LEARNED.exists():
+    SCENARIOS += [s for s in yaml.safe_load(LEARNED.read_text(encoding="utf-8")) or [] if s.get("status") != "needs_review"]
 
 
 @pytest.mark.parametrize("sc", SCENARIOS, ids=[s["name"] for s in SCENARIOS])

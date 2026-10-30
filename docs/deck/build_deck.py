@@ -423,14 +423,14 @@ title(s, "Pilot in four cities, scale in nine months", "Rollout & risks")
 phases = [
     ("Months 0–2 · Pilot", "Pune, Bengaluru, Jaipur, Lucknow. Offices + GST micro retail. Web and WhatsApp links, 50 partners"),
     ("Months 3–5 · Expand", "10 languages with voice, all channel partners onboarded, live DigiLocker and e-sign"),
-    ("Months 6–9 · Scale", "All tier-1/2 cities; multi-site and manufacturers on a hybrid flow; propensity routing for field sales"),
+    ("Months 6–9 · Scale", "All tier-1/2 cities; hybrid flow for multi-site and manufacturers; fine-tune a small Indic model on consented chats"),
 ]
 for i, (h, b) in enumerate(phases):
     y = 1.6 + i * 1.08
     circle_num(s, 0.5, y, i + 1)
     text(s, 1.0, y - 0.02, 3.4, 1.0, [[(h, {"bold": True, "size": 13})], [(b, {"color": MUTED})]], size=11, space_after=2)
 risks = [
-    ("Wrong advice", "rules engine decides; 15 scenario tests; human hand-off"),
+    ("Wrong advice", "rules engine decides; 18 scenario tests; human hand-off"),
     ("Forged documents", "registry, checksum, cross-document and blur checks on every upload"),
     ("Channel conflict", "partner attribution and commission on assisted journeys"),
     ("Install capacity", "slot booking; 5G AirFiber in 2 days where fibre is late"),

@@ -6,6 +6,7 @@ import logging
 import re
 
 from app.data.loader import SEGMENT_NAMES, get_dataset
+from app.services import learning
 from app.services.llm import LLMUnavailable, get_router, redact
 from app.services.cities import SMALL_TOWN, tier_for
 from app.services.cities import find_in_text as find_city
@@ -259,7 +260,7 @@ did not mention, or use placeholders like "?" or "unknown"; leave the key out in
  when the main one fails, cloud_backup = backing up files/data), mobile_lines (int), cameras (int), pos_counters (int),
  devices (int), vehicles (int), machines (int), fibre_available (bool), budget_monthly (int rupees).
 CURRENT PROFILE: {profile}
-MISSING: {missing}"""
+MISSING: {missing}{examples}"""
 
 EXPLAIN = """You explain an Accel Business bundle to a small-business owner in {language}.
 Business: {business}. Products chosen by our system (do not add, remove or rename any; do not mention prices):
@@ -273,11 +274,18 @@ def _llm_turn(prof: Profile, history: list[dict], lang: str) -> dict | None:
     if not router.available():
         return None
     missing = prof.missing()
+    user_text = history[-1]["content"] if history else ""
+    shots = learning.examples(lang, user_text)
+    # past consented turns in this language show the model how answers like this map to slots
+    examples = "".join(
+        f"\nPAST EXAMPLE (same language): user said {json.dumps(e['text'], ensure_ascii=False)} -> updates "
+        f"{json.dumps(e['updates'], ensure_ascii=False)}" for e in shots)
     sys = SYSTEM.format(
         language=LANG_NAMES.get(lang, "English"),
         needs=", ".join(NEEDS),
         profile=json.dumps(prof.model_dump(exclude_none=True), ensure_ascii=False),
         missing=", ".join(missing) or "nothing - say thanks briefly",
+        examples=examples,
     )
     msgs = [{"role": "system", "content": sys}] + [
         {"role": m["role"], "content": redact(m["content"])} for m in history[-10:]

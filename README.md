@@ -14,6 +14,7 @@ Prototype for **YTL Hackathon 2026 · Enterprise Track A (Airtel SYNC)**. A smal
    - leads the advisor couldn't close, ranked by a propensity model (AUC 0.72), with the next best action
    - assignment to field sales or a channel partner
    - partner-assisted sessions through `/?partner=CODE`
+6. **Improvement loop**: with an optional consent, redacted advisor turns become prompt examples. 👎 conversations become draft test cases, and the lead model retrains on real journey outcomes. See [docs/architecture.md](docs/architecture.md#improvement-loop).
 
 Accel Telecom is fictional and all data is synthetic (see [data/README.md](data/README.md)).
 

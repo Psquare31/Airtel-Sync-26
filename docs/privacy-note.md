@@ -7,6 +7,7 @@
 - verification (required)
 - service activation (required)
 - marketing (optional, unticked by default)
+- improving the advisor (optional, unticked by default)
 
 Each purpose shows what is used, why, and how long it is kept. Every grant is written to an append-only `consent_ledger` with the notice version, language, timestamp and the purposes granted. If the owner declines, the journey routes to a partner for in-person KYC rather than forcing consent. Withdrawal is offered on the tracker and by replying STOP.
 
@@ -14,6 +15,7 @@ Each purpose shows what is used, why, and how long it is kept. Every grant is wr
 - The advisor stores only business-profile slots: type, size, sites, city tier, GST yes/no, current tools and needs. It stores no identity data.
 - KYC fields are used only to verify and provision.
 - Back-office scoring uses only lead-time attributes (segment, size, source, GST status). It never uses KYC documents.
+- Advisor chats are kept for improvement only with that consent. Each turn is redacted (IDs, phone numbers, emails) and stored with the answers taken from it. It is used as a prompt example for later owners in the same language, and flagged conversations become test cases. Nothing is kept before consent is given, and nothing is used for marketing.
 
 **3. Data minimisation.**
 - **Document images are never stored.** An upload is read in memory, passed to the extractor and discarded. We keep only the extracted fields plus a SHA-256 of the file, so tampering or replacement can be proven later.
@@ -36,6 +38,7 @@ Each purpose shows what is used, why, and how long it is kept. Every grant is wr
 | Extracted KYC fields (pending orders) | `purge_after` = 30 days |
 | Extracted KYC fields (activated customers) | Account life + 8 years (telecom licence / KYC record-keeping) |
 | Abandoned journeys | Purged after 90 days |
+| Redacted chat turns (improvement consent) | 12 months, deleted at once if that consent is withdrawn |
 | Consent records | Kept as evidence for as long as the data they cover |
 
 **7. Security controls.**

@@ -1,12 +1,13 @@
 """Back-office for sales and channel partners: leads the advisor couldn't close."""
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlmodel import select
 
 from app.config import get_settings
 from app.data.loader import get_dataset
 from app.db import Journey, LeadAction, audit, session
-from app.services.propensity import RECOVERABLE, explain_row, get_model
+from app.services import learning
+from app.services.propensity import RECOVERABLE, explain_row, get_model, journey_rows
 from app.services.validators import mask
 
 router = APIRouter(prefix="/api/backoffice", tags=["backoffice"])
@@ -51,6 +52,8 @@ def summary():
         "live_handoffs": sum(1 for j in live if j.handoff_reason),
         "model_auc": round(model.auc, 3),
         "model_factors": model.top_factors,
+        "model_trained_at": model.trained_at,
+        "model_live_rows": model.n_live,
     }
 
 
@@ -61,12 +64,14 @@ def leads(segment: str | None = None, city: str | None = None, source: str | Non
     with session() as s:
         actions = {a.lead_id: a for a in s.exec(select(LeadAction)).all()}
         live = s.exec(select(Journey).where(Journey.handoff_reason.is_not(None))).all()
-    for j in sorted(live, key=lambda j: j.updated_at, reverse=True):
+    live = sorted(live, key=lambda j: j.updated_at, reverse=True)
+    live_scores = get_model().score(journey_rows(live)) if live else []
+    for j, score in zip(live, live_scores):
         out.append({
             "lead_id": j.id, "source": "Digital advisor" + (f" (partner {j.partner_code})" if j.partner_code else ""),
             "business_name": j.business_name or "New business", "segment": j.segment, "city": j.city,
             "stage": j.stage, "reason": j.handoff_reason, "action": HANDOFF_ACTIONS.get(j.handoff_reason or "", "Call back"),
-            "score": 0.9, "monthly_value": j.monthly_value, "live": True,
+            "score": round(float(score), 3), "monthly_value": j.monthly_value, "live": True,
             "why": ["Live journey: owner is engaged right now"],
             "assigned": actions[j.id].assigned_to if j.id in actions else None,
         })
@@ -108,3 +113,24 @@ def assign(lead_id: str, body: AssignBody, key: str = Depends(require_staff)):
         s.commit()
     audit("staff", "lead_assigned", None, lead_id=lead_id, to=body.assigned_to, channel=body.channel)
     return {"ok": True}
+
+
+@router.get("/learning", dependencies=[Depends(require_staff)])
+def learning_stats():
+    model = get_model()
+    return {**learning.stats(), "model": {"auc": round(model.auc, 3), "trained_at": model.trained_at,
+                                          "live_rows": model.n_live, "lead_rows": model.n_leads}}
+
+
+@router.get("/learning/scenarios.yaml", dependencies=[Depends(require_staff)])
+def learning_scenarios():
+    """Thumbs-down conversations as draft advisor test cases."""
+    return Response(learning.export_scenarios(), media_type="text/yaml; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=learned_scenarios.yaml"})
+
+
+@router.post("/model/retrain", dependencies=[Depends(require_staff)])
+def retrain():
+    model = get_model(force=True)
+    audit("staff", "model_retrained", None, auc=round(model.auc, 3), live_rows=model.n_live)
+    return {"auc": round(model.auc, 3), "trained_at": model.trained_at, "live_rows": model.n_live}

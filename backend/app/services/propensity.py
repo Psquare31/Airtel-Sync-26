@@ -6,8 +6,9 @@ drop reasons are excluded to avoid leakage.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
-from functools import lru_cache
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -60,16 +61,83 @@ class PropensityModel:
     auc: float
     base_rate: float
     top_factors: list[dict]
+    n_leads: int = 0
+    n_live: int = 0
+    trained_at: str = ""
 
     def score(self, df: pd.DataFrame) -> np.ndarray:
         return self.pipeline.predict_proba(_features(df))[:, 1]
 
 
-@lru_cache
-def get_model() -> PropensityModel:
+LANG_NAMES = {"en": "English", "hi": "Hindi", "hinglish": "Hindi", "ta": "Tamil", "mr": "Marathi", "te": "Telugu",
+              "bn": "Bengali", "kn": "Kannada", "gu": "Gujarati", "ml": "Malayalam", "pa": "Punjabi"}
+STALE_AFTER = timedelta(days=7)
+RETRAIN_EVERY_S = 6 * 3600
+
+_model: PropensityModel | None = None
+_trained_at = 0.0
+
+
+def journey_rows(journeys) -> pd.DataFrame:
+    """Live journeys in the leads-file schema, so one model scores both."""
+    from app.data.loader import SEGMENT_NAMES
+
+    rows = []
+    for j in journeys:
+        p = j.profile or {}
+        rows.append({
+            "lead_id": j.id,
+            "lead_source": "Digital advisor" + (" (partner)" if j.partner_code else ""),
+            "segment": SEGMENT_NAMES.get(p.get("segment") or j.segment or "", "Micro retail & services"),
+            "city_tier": p.get("city_tier") or 2,
+            "preferred_language": LANG_NAMES.get(j.lang, "English"),
+            "annual_turnover_band": "NA",
+            "has_gstin": "Y" if p.get("has_gstin") else "N",
+            "has_udyam": "Y" if p.get("has_udyam") else "N",
+            "current_internet": p.get("current_internet") or "NA",
+            "current_provider": "NA",
+            "employee_count": p.get("employees") or 1,
+            "num_sites": p.get("sites") or 1,
+            "monthly_telecom_spend_inr": p.get("current_spend") or 0,
+            "products_of_interest": ";".join(p.get("needs") or []) or None,
+        })
+    return pd.DataFrame(rows)
+
+
+def _live_outcomes() -> tuple[pd.DataFrame, np.ndarray]:
+    """Journeys with a known outcome: ordered = 1; handed off or idle for a week = 0."""
+    from sqlmodel import select
+
+    from app.db import Journey, now, session
+
+    with session() as s:
+        journeys = s.exec(select(Journey)).all()
+    t = now()
+    labelled, y = [], []
+    for j in journeys:
+        updated = j.updated_at if j.updated_at.tzinfo else j.updated_at.replace(tzinfo=t.tzinfo)
+        if j.order_id:
+            labelled.append(j); y.append(1)
+        elif j.handoff_reason or updated < t - STALE_AFTER:
+            labelled.append(j); y.append(0)
+    return journey_rows(labelled), np.array(y, dtype=int)
+
+
+def train(include_live: bool = True) -> PropensityModel:
     leads = get_dataset().leads
-    y = (leads["outcome"] == "Activated").astype(int).values
     X = _features(leads)
+    y = (leads["outcome"] == "Activated").astype(int).values
+    n_live = 0
+    if include_live:
+        try:
+            live, live_y = _live_outcomes()
+        except Exception as err:  # noqa: BLE001 - a DB hiccup must not stop scoring
+            log.warning("live outcomes unavailable: %s", err)
+            live, live_y = pd.DataFrame(), np.array([], dtype=int)
+        if len(live):
+            X = pd.concat([X, _features(live)], ignore_index=True)
+            y = np.concatenate([y, live_y])
+            n_live = len(live)
     pipe = Pipeline([
         ("prep", ColumnTransformer([
             ("cat", OneHotEncoder(handle_unknown="ignore", min_frequency=20), CATEGORICAL),
@@ -86,8 +154,18 @@ def get_model() -> PropensityModel:
     order = np.argsort(-np.abs(coefs))[:10]
     factors = [{"feature": names[i].replace("cat__", "").replace("num__", ""), "weight": round(float(coefs[i]), 3)}
                for i in order]
-    log.info("propensity AUC (5-fold) = %.3f", auc)
-    return PropensityModel(pipeline=pipe, auc=auc, base_rate=float(y.mean()), top_factors=factors)
+    log.info("propensity AUC (5-fold) = %.3f on %d leads + %d live journeys", auc, len(leads), n_live)
+    return PropensityModel(pipeline=pipe, auc=auc, base_rate=float(y.mean()), top_factors=factors,
+                           n_leads=len(leads), n_live=n_live, trained_at=datetime.now(timezone.utc).isoformat())
+
+
+def get_model(force: bool = False) -> PropensityModel:
+    """Cached model, retrained every few hours so new journey outcomes feed back in."""
+    global _model, _trained_at
+    if force or _model is None or time.monotonic() - _trained_at > RETRAIN_EVERY_S:
+        _model = train()
+        _trained_at = time.monotonic()
+    return _model
 
 
 def explain_row(row: pd.Series) -> list[str]:

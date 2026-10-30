@@ -1,6 +1,7 @@
 import { KeyRound, Phone, UserPlus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
+import { LearningPanel } from '../components/LearningPanel'
 import { inr } from '../i18n'
 
 interface Summary {
@@ -144,6 +145,8 @@ export default function Backoffice() {
           </section>
         </>
       )}
+
+      <LearningPanel staffKey={key} />
 
       <div className="flex flex-wrap gap-2">
         <select value={segment} onChange={(e) => setSegment(e.target.value)} className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm">
