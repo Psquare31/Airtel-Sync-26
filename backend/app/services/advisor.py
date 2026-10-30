@@ -23,6 +23,7 @@ QUESTIONS = {
         "sites": "How many shops, branches or locations do you have?",
         "city": "Which city are you in?",
         "has_gstin": "Do you have a GST registration (GSTIN)? It's fine if you don't.",
+        "current_internet": "What do you use today for internet and calls? For example a mobile hotspot, home broadband, or another provider's business line.",
         "needs": "What do you need most? For example internet for UPI/billing, WhatsApp for customers, CCTV, business email, or backup internet.",
         "out_of_scope": "Sorry, that isn't something Accel Business offers. I can help with internet, business mobile lines, WhatsApp/SMS, cloud email, security and CCTV.",
         "handoff": "No problem. I've asked an Accel Business expert to call you back within 2 working hours. You can keep chatting meanwhile.",
@@ -36,6 +37,7 @@ QUESTIONS = {
         "sites": "आपकी कितनी दुकानें, ब्रांच या लोकेशन हैं?",
         "city": "आप किस शहर में हैं?",
         "has_gstin": "क्या आपके पास GST रजिस्ट्रेशन (GSTIN) है? नहीं है तो भी कोई बात नहीं।",
+        "current_internet": "अभी आप इंटरनेट और कॉल के लिए क्या इस्तेमाल करते हैं? जैसे मोबाइल हॉटस्पॉट, घर का ब्रॉडबैंड, या किसी और कंपनी की बिज़नेस लाइन।",
         "needs": "आपको सबसे ज़्यादा किस चीज़ की ज़रूरत है? जैसे UPI/बिलिंग के लिए इंटरनेट, ग्राहकों के लिए WhatsApp, CCTV, बिज़नेस ईमेल या बैकअप इंटरनेट।",
         "out_of_scope": "माफ़ कीजिए, यह Accel Business की सेवा नहीं है। मैं इंटरनेट, बिज़नेस मोबाइल, WhatsApp/SMS, क्लाउड ईमेल, सिक्योरिटी और CCTV में मदद कर सकता हूँ।",
         "handoff": "ठीक है। Accel Business के एक्सपर्ट 2 कामकाजी घंटों में आपको कॉल करेंगे। तब तक आप चैट जारी रख सकते हैं।",
@@ -86,6 +88,23 @@ HINDI_BIZ = {"दुकान": "shop", "क्लिनिक": "clinic", "फ�
              "रेस्टोरेंट": "restaurant", "कोचिंग": "coaching centre", "सैलून": "salon", "फार्मेसी": "pharmacy",
              "ऑफिस": "office", "दफ़्तर": "office", "चेन": "chain", "ब्रांच": "branches", "यूनिट": "unit",
              "दवाखाना": "clinic", "मेडिकल": "pharmacy", "बेकरी": "bakery"}
+
+
+CURRENT_TOOLS = [
+    (r"leased line|dedicated line|ill\b|लीज़्ड|लीज्ड", "Leased line"),
+    (r"different (isp|provider)s?|mixed|each (shop|branch|store|site) has", "Mixed per site"),
+    (r"hotspot|mobile data|phone (data|internet)|jio ?fi|dongle|हॉटस्पॉट|मोबाइल डेटा", "Mobile hotspot"),
+    (r"home (broadband|wifi|wi-fi|connection)|ghar|घर", "Home broadband"),
+    (r"business (broadband|line|internet)|fibre|fiber|broadband|act fibernet|hathway|bsnl|wifi|wi-fi|ब्रॉडबैंड", "Business broadband"),
+    (r"\b(nothing|none|no internet)\b|कुछ नहीं|कोई नहीं", "None"),
+]
+
+
+def _current_tools(low: str) -> str | None:
+    for pattern, label in CURRENT_TOOLS:
+        if re.search(pattern, low):
+            return label
+    return None
 
 
 def _hindi_int(text: str) -> int | None:
@@ -175,6 +194,20 @@ def parse_message(text: str, expecting: str | None, prof: Profile) -> dict:
             upd["has_gstin"] = True
     if re.search(r"udyam|msme", low):
         upd["has_udyam"] = not re.search(r"(no|without|not|nahi)\s+(\w+\s)?(udyam|msme)", low)
+
+    # only read "what they use today" when asked, or when the message says so ("using", "today", ...)
+    asked = expecting == "current_internet" or re.search(
+        r"\b(use|using|used|currently|today|right now|existing|at the moment|we have|on (a |my |our )?(home|mobile|business))\b"
+        r"|अभी|इस्तेमाल", low)
+    current = _current_tools(low) if asked else None
+    if current:
+        upd["current_internet"] = current
+    elif expecting == "current_internet" and t:
+        upd["current_internet"] = "Not specified"
+    spend = re.search(r"(?:rs\.?|₹|inr)\s*([\d,]{3,6})\s*(?:/|a|per|every)?\s*(?:month|mahina|महीना)|"
+                      r"(?:pay|spend|paying|spending|bill(?: is)?)\s*(?:about|around)?\s*(?:rs\.?|₹)?\s*([\d,]{3,6})", low)
+    if spend:
+        upd["current_spend"] = int((spend.group(1) or spend.group(2)).replace(",", ""))
 
     needs = [key for pattern, key in NEED_KEYWORDS if re.search(pattern, low)]
     if needs:
@@ -285,6 +318,9 @@ def advisor_turn(prof: Profile, history: list[dict], user_text: str, lang: str) 
             known = city_tier(prof.city, get_dataset().city_tiers)
             if known:
                 prof.city_tier = known
+            # the model answers in free text; recommendation reasons key off the canonical label
+            if prof.current_internet:
+                prof.current_internet = _current_tools(prof.current_internet.lower()) or prof.current_internet
         if llm.get("intent") in ("wants_human", "out_of_scope"):
             intent = llm["intent"]
         reply = (llm.get("reply") or "").strip() or None

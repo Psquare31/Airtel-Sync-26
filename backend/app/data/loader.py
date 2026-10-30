@@ -76,6 +76,8 @@ class Dataset:
     udyam: dict[str, dict]
     city_tiers: dict[str, int] = field(default_factory=dict)
     city_states: dict[str, str] = field(default_factory=dict)
+    # normalised enterprise name -> Udyam records, to tell if a business is Udyam-registered
+    udyam_by_name: dict[str, list[dict]] = field(default_factory=dict)
 
 
 def _read(name: str) -> pd.DataFrame:
@@ -119,6 +121,9 @@ def get_dataset() -> Dataset:
     gstin = {r["gstin"].upper(): r for r in _read("mock_gstin_registry").to_dict("records")}
     udyam = {r["udyam_number"].upper(): r for r in _read("mock_udyam_registry").to_dict("records")}
     cities = leads[["city", "city_tier", "state"]].drop_duplicates("city")
+    by_name: dict[str, list[dict]] = {}
+    for rec in udyam.values():
+        by_name.setdefault(norm_name(rec["enterprise_name"]), []).append(rec)
     return Dataset(
         products=products,
         leads=leads,
@@ -126,4 +131,9 @@ def get_dataset() -> Dataset:
         udyam=udyam,
         city_tiers={c.lower(): int(t) for c, t in zip(cities.city, cities.city_tier)},
         city_states={c.lower(): s for c, s in zip(cities.city, cities.state)},
+        udyam_by_name=by_name,
     )
+
+
+def norm_name(name: str) -> str:
+    return "".join(ch for ch in (name or "").lower() if ch.isalnum())

@@ -1,11 +1,12 @@
 import { AlertTriangle, Camera, CheckCircle2, CloudDownload, FileText, Loader2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api, type Check, type RegistryResult, type UploadResult } from '../../api'
+import { api, type Check, type RegistryResult, type UdyamResult, type UploadResult } from '../../api'
 import type { StepProps } from '../JourneyPage'
 
 const SAMPLES = ['K01', 'K02', 'K03', 'K04', 'K05', 'K06', 'K07', 'K08', 'K09', 'K10', 'K11', 'K12']
 const GSTIN_RE = /^[0-9]{2}[A-Z0-9]{10}[0-9A-Z]Z[0-9A-Z]$/
+const UDYAM_RE = /^UDYAM-[A-Z]{2}-[0-9]{2}-[0-9]{7}$/
 
 export default function Kyc({ journey, resume, busy }: StepProps) {
   const { t } = useTranslation()
@@ -15,6 +16,7 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
   const [gstin, setGstin] = useState('')
   const [udyam, setUdyam] = useState('')
   const [lookup, setLookup] = useState<RegistryResult | null>(null)
+  const [udyamLookup, setUdyamLookup] = useState<UdyamResult | null>(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -26,6 +28,16 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
     const h = setTimeout(() => api.gstin(g).then(setLookup).catch(() => setLookup(null)), 300)
     return () => clearTimeout(h)
   }, [gstin])
+
+  useEffect(() => {
+    const u = udyam.trim().toUpperCase()
+    if (!UDYAM_RE.test(u)) {
+      setUdyamLookup(null)
+      return
+    }
+    const h = setTimeout(() => api.udyam(u).then(setUdyamLookup).catch(() => setUdyamLookup(null)), 300)
+    return () => clearTimeout(h)
+  }, [udyam])
 
   if (p?.kind !== 'kyc') return null
   const docTypes = [...p.required, ...p.optional]
@@ -77,9 +89,8 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
       {result && <ResultPanel result={result} />}
 
       <section className="card flex flex-col gap-2 p-4">
-        <p className="flex items-center gap-2 font-semibold">
-          <CloudDownload size={18} className="text-brand" aria-hidden /> {t('digilocker')}
-        </p>
+        <p className="font-semibold">Your registration numbers</p>
+        <p className="text-xs text-muted">Checked live against the GST and Udyam registries.</p>
         <input
           value={gstin}
           onChange={(e) => setGstin(e.target.value.toUpperCase())}
@@ -100,13 +111,20 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
         <input
           value={udyam}
           onChange={(e) => setUdyam(e.target.value.toUpperCase())}
-          placeholder="Udyam number (optional) UDYAM-XX-00-0000000"
+          placeholder="Udyam number, if registered: UDYAM-XX-00-0000000"
           className="rounded-lg border border-line px-3 py-2 font-mono uppercase placeholder:normal-case placeholder:font-sans"
+          maxLength={19}
           aria-label="Udyam number"
         />
-        <button className="btn btn-ghost" onClick={digilocker} disabled={!gstin.trim() || working !== null}>
-          {working === 'digilocker' ? <Loader2 className="animate-spin" size={18} /> : <CloudDownload size={18} />} {t('digilocker')}
-        </button>
+        {udyamLookup && (
+          <p className={`text-sm ${udyamLookup.found ? 'text-ok' : 'text-bad'}`}>
+            {!udyamLookup.valid_format
+              ? udyamLookup.problems?.join('. ')
+              : !udyamLookup.found
+                ? 'Not found in the Udyam registry'
+                : `${udyamLookup.enterprise_name} · ${udyamLookup.enterprise_type} enterprise · ${udyamLookup.city}`}
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
@@ -122,6 +140,16 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
           />
         ))}
       </section>
+
+      <button
+        className="flex items-center gap-2 self-start text-sm text-muted underline-offset-2 hover:underline"
+        onClick={digilocker}
+        disabled={!gstin.trim() || working !== null}
+        title="Enter your GSTIN above first"
+      >
+        {working === 'digilocker' ? <Loader2 className="animate-spin" size={16} /> : <CloudDownload size={16} />}
+        Or fetch the GST and Udyam certificates from DigiLocker
+      </button>
 
       <details className="card p-3 text-sm">
         <summary className="cursor-pointer font-medium">{t('useSample')} (demo specimen documents)</summary>
@@ -139,7 +167,7 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
       <button
         className="btn btn-primary w-full"
         disabled={busy || working !== null}
-        onClick={() => resume({ kind: 'kyc', action: 'submit', gstin: gstin.trim() || undefined })}
+        onClick={() => resume({ kind: 'kyc', action: 'submit', gstin: gstin.trim() || undefined, udyam_number: udyam.trim() || undefined })}
       >
         {busy ? (
           <>
@@ -181,12 +209,16 @@ function DocCard({ label, optional, doc, failed, working, onFile }: {
         )}
         <div className="min-w-0 flex-1">
           <p className="font-medium">
-            {label} {optional && <span className="text-xs text-muted">({t('optionalDoc')})</span>}
+            {label} {optional && <span className="text-xs text-muted">(if Udyam-registered)</span>}
           </p>
-          {doc && (
-            <p className="truncate text-xs text-muted">
-              {doc.source === 'digilocker' ? 'DigiLocker · issuer-verified' : `Read by ${doc.extractor}`}
-            </p>
+          {working ? (
+            <p className="text-xs text-muted">Reading your document… this can take up to 30 seconds</p>
+          ) : (
+            doc && (
+              <p className="truncate text-xs text-muted">
+                {doc.source === 'digilocker' ? 'DigiLocker · issuer-verified' : `Read by ${doc.extractor}`}
+              </p>
+            )
           )}
         </div>
         <label className="btn btn-ghost cursor-pointer px-3 py-1.5 text-sm">

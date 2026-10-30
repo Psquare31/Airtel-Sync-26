@@ -102,3 +102,35 @@ def test_reader_busy_when_vision_down_and_local_ocr_off(monkeypatch):
     ext = ocr.extract(data, "signatory_id")
     checks = kyc.document_checks("signatory_id", ext, data)
     assert ext["extractor"] == "unavailable" and checks[0].id == "reader_busy"
+
+
+def test_busy_document_only_asks_for_retry():
+    busy = {"fields": {}, "detected_type": None, "checks": [
+        {"id": "reader_busy", "status": "fail", "message": "busy", "doc": "address_proof"}]}
+    res = verify({
+        "gst_certificate": gst("19EOGXH4115Y1ZL", "Joseph Shah (Prop. Harmony Dental Care)", "Harmony Dental Care",
+                               address=K02_ADDR),
+        "signatory_id": sig("Joseph Shah", "Owner", "Harmony Dental Care"),
+        "udyam_certificate": udyam("UDYAM-WB-00-5053330", "Harmony Dental Care"),
+        "address_proof": busy,
+    })
+    assert res["outcome"] == "fixable"
+    assert {c["id"] for c in res["checks"] if c["status"] == "fail"} == {"reader_busy"}
+
+
+def test_registered_business_must_upload_udyam():  # K05
+    addr = "Shop/Unit 38, Civil Lines, Kochi, Kerala - 752083"
+    res = verify({
+        "gst_certificate": gst("32TZAXB5481U1Z1", "Balaji Realty LLP", "Balaji Realty LLP", "Limited Liability Partnership", addr),
+        "signatory_id": sig("Anita Shah", "Partner", "Balaji Realty LLP"),
+        "address_proof": bill("Balaji Realty LLP", addr, "2026-06-11"),
+    })
+    assert res["outcome"] == "fixable" and failed(res) == {"missing_udyam_certificate"}
+
+
+def test_udyam_registration_lookup():
+    from app.data.loader import get_dataset
+    from app.services.kyc import _registered_udyam
+
+    assert _registered_udyam(get_dataset().gstin["32TZAXB5481U1Z1"])["udyam_number"] == "UDYAM-KL-00-5521886"
+    assert _registered_udyam(get_dataset().gstin["37IHKXV5167L1ZS"]) is None  # K01: no Udyam registration

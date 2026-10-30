@@ -266,7 +266,7 @@ title(s, "One sitting: advise, quote, verify, sign, track", "The journey")
 steps = [
     ("Advisor", "Chat or voice in 10+ languages; 6 questions; deterministic bundle with plain-language reasons"),
     ("Quote", "One monthly price; toggle add-ons, quantities, 12/24 months; dependencies auto-added"),
-    ("Smart KYC", "DPDP consent, DigiLocker or photo, GSTIN/Udyam lookup, 15 automatic checks"),
+    ("Smart KYC", "DPDP consent, photo upload with extraction, live GSTIN/Udyam lookup, 15+ automatic checks"),
     ("e-Sign & track", "OTP e-sign, install slot, live tracker and WhatsApp updates instead of calls"),
 ]
 for i, (h, b) in enumerate(steps):
@@ -329,7 +329,8 @@ kyc_rows = [
     ("K06", "Fix", "GSTIN check digit wrong: altered number"),
     ("K07", "Blocked", "Legal name differs from GST registry"),
     ("K11", "Fix", "Bill 257 days old; 'Owner' can't sign for a Pvt Ltd"),
-    ("K05, K10", "Fix", "'Owner' isn't a signing role for an LLP"),
+    ("K05", "Fix", "Udyam-registered but no certificate; 'Owner' can't sign for an LLP"),
+    ("K10", "Fix", "'Owner' isn't a signing role for an LLP"),
     ("K02, K03, K08, K09, K12", "Verified", "incl. skewed scan and O/0 OCR auto-repair"),
 ]
 tbl = s.shapes.add_table(len(kyc_rows), 3, Inches(0.5), Inches(1.6), Inches(5.2), Inches(3.0)).table
@@ -347,10 +348,10 @@ for r, row in enumerate(kyc_rows):
                 run.font.size, run.font.name = Pt(10.5), FONT
                 run.font.bold = c < 2
                 run.font.color.rgb = (OK if val == "Verified" else RED) if c == 1 else INK
-text(s, 0.5, 4.72, 5.2, 0.35, "Offline result on all 12 specimen applicants (scripts/kyc_batch.py), no LLM needed.", size=10, color=MUTED)
+text(s, 0.5, 4.93, 5.2, 0.25, "Offline result on all 12 specimen applicants (scripts/kyc_batch.py), no LLM needed.", size=10, color=MUTED)
 priv = [
     ("Consent by purpose", "verify · activate · marketing (opt-in), versioned ledger, withdraw anytime"),
-    ("Minimise", "images read in memory and deleted; only fields + SHA-256 kept; DigiLocker preferred"),
+    ("Minimise", "images read in memory and deleted; only extracted fields + SHA-256 kept"),
     ("Mask & redact", "GSTIN/ID masked in UI and logs; PII stripped before LLM calls"),
     ("Retain & purge", "pending KYC 30 days, abandoned journeys 90 days, audit log of every action"),
 ]
@@ -429,8 +430,8 @@ for i, (h, b) in enumerate(phases):
     circle_num(s, 0.5, y, i + 1)
     text(s, 1.0, y - 0.02, 3.4, 1.0, [[(h, {"bold": True, "size": 13})], [(b, {"color": MUTED})]], size=11, space_after=2)
 risks = [
-    ("Wrong advice", "rules engine decides; 12 scenario tests; human hand-off"),
-    ("Forged documents", "registry + checksum + cross-document checks; DigiLocker first"),
+    ("Wrong advice", "rules engine decides; 15 scenario tests; human hand-off"),
+    ("Forged documents", "registry, checksum, cross-document and blur checks on every upload"),
     ("Channel conflict", "partner attribution and commission on assisted journeys"),
     ("Install capacity", "slot booking; 5G AirFiber in 2 days where fibre is late"),
     ("Price-sensitive micro", "24-month price, starter bundle, setup in EMIs"),

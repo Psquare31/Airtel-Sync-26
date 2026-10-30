@@ -11,14 +11,14 @@
 Each purpose shows what is used, why, and how long it is kept. Every grant is written to an append-only `consent_ledger` with the notice version, language, timestamp and the purposes granted. If the owner declines, the journey routes to a partner for in-person KYC rather than forcing consent. Withdrawal is offered on the tracker and by replying STOP.
 
 **2. Purpose limitation.**
-- The advisor stores only business-profile slots: type, size, sites, city tier, GST yes/no and needs. It stores no identity data.
+- The advisor stores only business-profile slots: type, size, sites, city tier, GST yes/no, current tools and needs. It stores no identity data.
 - KYC fields are used only to verify and provision.
 - Back-office scoring uses only lead-time attributes (segment, size, source, GST status). It never uses KYC documents.
 
 **3. Data minimisation.**
 - **Document images are never stored.** An upload is read in memory, passed to the extractor and discarded. We keep only the extracted fields plus a SHA-256 of the file, so tampering or replacement can be proven later.
-- DigiLocker pulls replace uploads where possible: they carry issuer-signed data, so no image is needed at all.
-- Udyam is optional, and the system asks only for the documents the chosen bundle needs.
+- An optional DigiLocker pull can stand in for the GST and Udyam uploads. It carries issuer-signed data, so no image is processed at all.
+- The Udyam certificate is asked for only when the registry shows the business is Udyam-registered.
 
 **4. Masking.** GSTIN, Udyam, ID and consumer numbers are masked (e.g. `37••••••••••1ZS`) in API responses, the UI, back-office lists and logs. The audit log records actions, never raw identifiers.
 

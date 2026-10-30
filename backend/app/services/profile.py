@@ -154,7 +154,9 @@ class Profile(BaseModel):
             order.append("city")
         if self.has_gstin is None:
             order.append("has_gstin")
-        if not self.needs and self.current_internet is None:
+        if self.current_internet is None:
+            order.append("current_internet")
+        if not self.needs:
             order.append("needs")
         return order
 

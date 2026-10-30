@@ -122,6 +122,7 @@ class ModelRouter:
 
     def soonest_free(self, models: list[str]) -> float | None:
         """Seconds until the first of these models leaves cooldown (0 if one is free)."""
+        models = self.usable(models)
         now = time.monotonic()
         with self._lock:
             waits = [max(0.0, self._cooldowns.get(m, 0) - now) for m in models]

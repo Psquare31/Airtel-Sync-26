@@ -6,9 +6,8 @@ Prototype for **YTL Hackathon 2026 · Enterprise Track A (Airtel SYNC)**. A smal
 2. **Quote & checkout**: one transparent monthly price with GST shown. Add-ons toggle on and off, quantities can change, the price drops with a 24-month contract, and the setup fee can be spread into instalments.
 3. **Smart KYC**:
    - consent screen with separate purposes (DPDP)
-   - DigiLocker pull or photo upload
-   - document extraction (Groq vision, with a local OCR fallback)
-   - GSTIN checksum and mock GSTIN/Udyam registry lookups
+   - document photo upload with extraction (Groq vision, with a local OCR fallback), plus an optional DigiLocker pull
+   - live mock GSTIN and Udyam registry lookups, and a GSTIN checksum
    - cross-document checks
 4. **e-Sign & tracker**: OTP e-sign, an installation slot, a live order timeline, WhatsApp-style updates, and "ask about my order".
 5. **Back-office (stretch)**:
@@ -72,7 +71,8 @@ Current offline KYC result on the specimen pack:
 | K02 | verified | skewed scan (auto-deskew); OCR `0`→`O` repaired via checksum |
 | K03, K08, K09, K12 | verified | – |
 | K04 | fixable | GST certificate photo too **blurry** |
-| K05, K10 | fixable | "Owner" can't sign for an **LLP** |
+| K05 | fixable | business is **Udyam-registered** but no certificate was uploaded; "Owner" can't sign for an **LLP** |
+| K10 | fixable | "Owner" can't sign for an **LLP** |
 | K06 | fixable | GSTIN **check digit wrong** (altered number) |
 | K07 | blocked | legal name on certificate ≠ **GST registry** |
 | K11 | fixable | address proof **257 days old**; "Owner" can't sign for a **Pvt Ltd** |

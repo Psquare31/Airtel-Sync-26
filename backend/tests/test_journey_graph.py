@@ -23,7 +23,7 @@ def start(graph, jid="JTEST"):
 
 
 def chat_to_quote(graph, jid):
-    graph.invoke(Command(resume={"text": "I run a dental clinic in Kolkata with 6 staff, 1 clinic, we have GST"}), cfg(jid))
+    graph.invoke(Command(resume={"text": "I run a dental clinic in Kolkata with 6 staff, 1 clinic, we have GST, home broadband today"}), cfg(jid))
     if pending(graph, jid)["kind"] == "chat":
         graph.invoke(Command(resume={"text": "email and backup"}), cfg(jid))
     assert pending(graph, jid)["kind"] == "quote"
@@ -39,6 +39,7 @@ def add_docs(jid, gstin="19EOGXH4115Y1ZL", bill_date="2026-06-01"):
         "signatory_id": {"name": "Joseph Shah", "designation": "Owner", "business_name": "Harmony Dental Care",
                          "valid_till": "2028-01-01"},
         "address_proof": {"billed_to": "Harmony Dental Care", "address": ADDR, "bill_date": bill_date},
+        "udyam_certificate": {"udyam_number": "UDYAM-WB-00-5053330", "enterprise_name": "Harmony Dental Care"},
     }
     with session() as s:
         for t, f in docs.items():

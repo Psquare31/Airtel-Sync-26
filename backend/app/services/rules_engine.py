@@ -14,6 +14,9 @@ from app.services.profile import Profile
 REASONS = {
     "CORE_CONNECTIVITY": "Fast, unlimited internet is the base of your setup ({name}).",
     "NO_FIBRE_FWA": "Fibre isn't confirmed at your address, so 5G AirFiber gets you online in about 2 days with no digging.",
+    "FROM_HOTSPOT": "Replaces the mobile hotspot with {name}, a fixed line that won't drop in the middle of a UPI payment.",
+    "FROM_HOME_BB": "Moves you from home broadband to {name}, a business line with priority support and an SLA.",
+    "FROM_MIXED": "One provider and one bill for all {sites} sites instead of a different ISP at each.",
     "HIGH_USERS": "With {employees} people online, {name} keeps video calls and cloud apps smooth.",
     "DEDICATED_LINE": "Your machines and ERP need guaranteed bandwidth with an SLA, so a leased line fits better than broadband.",
     "UPTIME_FAILOVER": "If the main line drops, the backup router switches over automatically so UPI, billing and calls keep working.",
@@ -133,6 +136,18 @@ def connectivity(b: _Builder) -> str | None:
     return pid
 
 
+UPGRADE_REASON = {"Mobile hotspot": "FROM_HOTSPOT", "Home broadband": "FROM_HOME_BB", "Mixed per site": "FROM_MIXED"}
+
+
+def _explain_upgrade(b: _Builder, pid: str | None) -> None:
+    """Ties the core line's reason to what the owner uses today."""
+    code = UPGRADE_REASON.get(b.prof.current_internet or "")
+    line = b.lines.get(pid or "")
+    if code and line and line.core:
+        line.reason_code = code
+        line.reason = REASONS[code].format(name=line.name, sites=b.prof.sites or 1)
+
+
 def recommend(prof: Profile) -> Recommendation:
     seg = prof.segment or "micro"
     prof = prof.model_copy(update={"segment": seg})
@@ -148,7 +163,7 @@ def recommend(prof: Profile) -> Recommendation:
     emp, sites = prof.employees or 1, prof.sites or 1
     users = max(1, min(emp, 50))
 
-    connectivity(b)
+    _explain_upgrade(b, connectivity(b))
 
     # mobile lines
     lines_qty = prof.mobile_lines or (1 if seg == "micro" else max(1, min(emp // 4 + 1, 10)))
