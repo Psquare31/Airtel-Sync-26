@@ -6,7 +6,7 @@ Prototype for **YTL Hackathon 2026 · Enterprise Track A (Airtel SYNC)**. A smal
 2. **Quote & checkout**: one transparent monthly price with GST shown. Add-ons toggle on and off, quantities can change, the price drops with a 24-month contract, and the setup fee can be spread into instalments.
 3. **Smart KYC**:
    - consent screen with separate purposes (DPDP)
-   - document photo upload with extraction (Groq vision, with a local OCR fallback), plus an optional DigiLocker pull
+   - document photo upload with extraction (Groq vision on the hosted prototype; our own OCR is built and switches on with one setting), plus an optional DigiLocker pull
    - live mock GSTIN and Udyam registry lookups, and a GSTIN checksum
    - cross-document checks
 4. **e-Sign & tracker**: OTP e-sign, an installation slot, a live order timeline, WhatsApp-style updates, and "ask about my order".
@@ -32,7 +32,7 @@ Accel Telecom is fictional and all data is synthetic (see [data/README.md](data/
 - **Backend**: FastAPI, with the onboarding journey as a **LangGraph** `StateGraph`. The graph uses interrupts and a Postgres or SQLite checkpointer.
 - **LLM**: Groq via a cooldown-aware `ModelRouter`.
   - Chat rotates through `gpt-oss-120b → qwen3-32b → llama-3.3-70b → gpt-oss-20b`.
-  - Documents use `llama-4-scout` vision.
+  - KYC documents: on the hosted prototype they are read by Groq vision (`qwen3.8-27b`, `KYC_VISION=true` in `render.yaml`), and the consent screen says so. Our own OCR (`ocr_local.py`, or `ocr_service/` as a separate service) is built and tested, and takes over automatically when it's installed or `OCR_SERVICE_URL` is set, so documents then never reach an AI provider.
   - Input screening uses `llama-prompt-guard-2-86m`.
   - Voice uses `whisper-large-v3-turbo`.
   - With no key, everything still works on rules plus local OCR.
@@ -62,6 +62,8 @@ Back-office: http://localhost:5173/backoffice (key `demo` locally).
 ```bash
 cd backend && pytest -q                       # 55 tests: rules, pricing, router rotation, advisor scenarios, KYC, graph paths, API
 python -m scripts.kyc_batch --ocr             # runs Smart KYC on all 12 specimen applicants offline
+# requirements-dev.txt includes the optional local OCR stack (requirements-ocr.txt).
+# The Docker image leaves it out unless built with --build-arg WITH_OCR=true (needs > 512 MB RAM).
 ```
 
 Current offline KYC result on the specimen pack:

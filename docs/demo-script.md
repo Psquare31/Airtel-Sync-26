@@ -13,6 +13,6 @@ Record on a phone-sized browser (Chrome DevTools, 390×844) or a real phone poin
 | 2:30–2:55 | Back-office | Show the funnel, the live hand-off from K07 at the top, and the ranked leads with *next best action*. Assign one to a channel partner. | "Leads the advisor couldn't close go to field sales or partners, ranked by a propensity model. Partners earn on assisted journeys, so digital adds to them rather than competing." |
 | 2:55–3:00 | — | Show the end card with the URL and repo. | "One plan, one bill, activated in days." |
 
-**Fallbacks while recording:** if Groq is slow, type instead of speaking. On the deployed free tier the specimen chips (K01–K12) are read by Groq vision only, because local OCR is switched off to stay within 512 MB. To show the offline OCR path, record against a local backend with `LOCAL_OCR=true`, where each document takes about 1–2 s.
+**Before recording:** Groq's free tier reads about 3 document images a minute, so upload the specimen documents shortly before recording or cut the waits in the edit. If Groq is slow, type instead of speaking.
 
-**Groq free-tier limit:** the vision model allows about 7,000 input tokens a minute, and each document image costs about 2,000 tokens, so roughly 3 documents a minute. After the first few, each photo takes about 20 s while the server waits out the limit. Upload the specimen documents shortly before recording, or cut the waits in the edit. DigiLocker pull is an optional extra and isn't part of the required Smart KYC flow.
+**Voice-over line for KYC:** "Today an AI reader extracts the fields, and the consent screen says so. Our own OCR is already built and switches on with one setting, so documents never leave our servers."

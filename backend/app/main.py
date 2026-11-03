@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +44,8 @@ def health():
         "ok": True,
         "env": settings.env,
         "db": "postgres" if settings.database_url else "sqlite",
+        "commit": os.environ.get("RENDER_GIT_COMMIT", "")[:7] or None,
+        "local_ocr": settings.ocr_enabled,
         "llm_configured": router.available(),
         "models": router.status(settings.chat_models),
     }

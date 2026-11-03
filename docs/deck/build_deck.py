@@ -290,7 +290,7 @@ title(s, "The LLM talks; deterministic code decides prices", "Architecture")
 cols = [
     (0.5, 1.75, "Phone · PWA", ["Advisor chat + voice", "Quote & checkout", "Consent & KYC upload", "e-Sign & tracker", "Back-office"], WHITE),
     (2.6, 2.55, "FastAPI + LangGraph", ["Journey graph · interrupts", "Advisor: parser + LLM slots", "Rules engine & pricing", "Smart KYC checks", "Tracker · propensity"], TINT),
-    (5.5, 2.05, "Groq ModelRouter", ["Prompt Guard 2 (input)", "gpt-oss-120b → qwen3-32b → llama-3.3-70b", "Llama 4 Scout vision", "Whisper speech"], WHITE),
+    (5.5, 2.05, "AI & OCR services", ["Groq: Prompt Guard 2 on input", "Groq chat: gpt-oss-120b → qwen3.8-27b", "Groq: Whisper speech", "KYC docs: Groq vision now; own OCR ready"], WHITE),
     (7.9, 1.6, "Data", ["Neon Postgres: checkpoints, consent, orders, audit", "CSV: catalogue, GSTIN & Udyam registries, leads"], WHITE),
 ]
 for i, (x, w, head, items, fill) in enumerate(cols):
@@ -318,7 +318,8 @@ for i, (h, b) in enumerate(points):
     x = 0.5 + i * 2.27
     text(s, x, 4.35, 2.1, 0.75, [[(h, {"bold": True, "size": 12})], [(b, {"color": MUTED, "size": 10})]], space_after=2)
 notes(s, "Stack: React + Vite PWA on Vercel; FastAPI + LangGraph on Render (Docker); Neon Postgres; Groq for chat, "
-         "vision (Llama 4 Scout), prompt guard and Whisper. 55 automated tests including advisor scenarios and model-rotation tests.")
+         "prompt guard and Whisper. KYC documents are read by Groq vision in the prototype; our own OCR (ocr_service/) is built and switches on by config. "
+         "100+ automated tests including advisor scenarios and model-rotation tests.")
 
 # ---------------------------------------------------------------- 7 KYC & privacy
 s = new_slide()
@@ -351,7 +352,7 @@ for r, row in enumerate(kyc_rows):
 text(s, 0.5, 4.93, 5.2, 0.25, "Offline result on all 12 specimen applicants (scripts/kyc_batch.py), no LLM needed.", size=10, color=MUTED)
 priv = [
     ("Consent by purpose", "verify · activate · marketing (opt-in), versioned ledger, withdraw anytime"),
-    ("Minimise", "images read in memory and deleted; only extracted fields + SHA-256 kept"),
+    ("Minimise", "images never stored, only fields + SHA-256; own OCR (ready) keeps them off AI providers"),
     ("Mask & redact", "GSTIN/ID masked in UI and logs; PII stripped before LLM calls"),
     ("Retain & purge", "pending KYC 30 days, abandoned journeys 90 days, audit log of every action"),
 ]

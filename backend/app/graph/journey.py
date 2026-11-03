@@ -28,7 +28,7 @@ from app.services.rules_engine import recommend
 
 log = logging.getLogger("journey")
 
-CONSENT_VERSION = "2026-10-v2"
+CONSENT_VERSION = "2026-11-v4"
 
 
 class JourneyState(TypedDict, total=False):
@@ -173,7 +173,7 @@ CONSENT_PURPOSES = {
         "required": True,
         "title": "Verify your business",
         "text": "We check your GSTIN/Udyam with government registries and read the documents you upload. "
-                "Images are deleted right after reading; we keep only the extracted details.",
+                "{reader} Images are deleted right after reading; we keep only the extracted details.",
         "retention": "Extracted details kept for the life of your account + 8 years (telecom licence rule); images: not stored.",
     },
     "service_activation": {
@@ -198,11 +198,37 @@ CONSENT_PURPOSES = {
 }
 
 
+READER_TEXT = {
+    "local": "They are read by our own document reader and never sent to an AI company.",
+    "service": "They are read by our own document reader and never sent to an AI company.",
+    "vision": "They are read by Groq's AI document reader (an outside AI provider) and not stored by us.",
+    "none": "They are read when our document reader is available.",
+}
+READER_PROCESSOR = {
+    "local": "Accel document reader (runs on our servers; images processed in memory, not stored)",
+    "service": "Accel document reader on Hugging Face hosting (images processed in memory, not stored)",
+    "vision": "Groq Inc. (reads your document images with an AI model; we don't store them)",
+    "none": "Accel document reader",
+}
+
+
+def consent_notice() -> dict:
+    """Notice text always names the document reader actually in use; the mode is part of the version."""
+    from app.services.ocr import reader_mode
+
+    mode = reader_mode()
+    purposes = {k: dict(v) for k, v in CONSENT_PURPOSES.items()}
+    purposes["kyc_verification"]["text"] = purposes["kyc_verification"]["text"].format(reader=READER_TEXT[mode])
+    chat = "Groq Inc. (advisor chat; ID numbers and contacts removed first)"
+    return {"version": f"{CONSENT_VERSION}-{mode}", "purposes": purposes,
+            "processors": ["Accel Telecom (data fiduciary)", READER_PROCESSOR[mode], chat, "Mock GST & Udyam registries"]}
+
+
 def consent_node(state: JourneyState) -> dict:
     _touch(state, stage="consent")
-    answer = interrupt({"kind": "consent", "version": CONSENT_VERSION, "purposes": CONSENT_PURPOSES,
-                        "processors": ["Accel Telecom (data fiduciary)", "Groq Inc. (AI document reading, no retention)",
-                                       "Mock GST & Udyam registries"],
+    notice = consent_notice()
+    answer = interrupt({"kind": "consent", "version": notice["version"], "purposes": notice["purposes"],
+                        "processors": notice["processors"],
                         "grievance": "privacy@accelbusiness.example · Grievance officer responds within 7 days"})
     answer = answer if isinstance(answer, dict) else {}
     purposes = {k: bool((answer.get("purposes") or {}).get(k)) for k in CONSENT_PURPOSES}
@@ -211,17 +237,17 @@ def consent_node(state: JourneyState) -> dict:
                 "handoff": _handoff(state, "consent_declined", "Owner declined online KYC; a partner can verify in person."),
                 "stage": "handoff"}
     with session() as s:
-        rec = ConsentRecord(journey_id=state["journey_id"], notice_version=CONSENT_VERSION,
+        rec = ConsentRecord(journey_id=state["journey_id"], notice_version=notice["version"],
                             lang=state.get("lang", "en"), purposes=purposes)
         s.add(rec)
         s.commit()
         s.refresh(rec)
         cid = rec.id
-    audit("owner", "consent_granted", state["journey_id"], purposes=purposes, version=CONSENT_VERSION)
+    audit("owner", "consent_granted", state["journey_id"], purposes=purposes, version=notice["version"])
     if purposes.get("improvement") and state.get("turn_log"):
         learning.persist(state["journey_id"], state.get("lang", "en"), (state.get("profile") or {}).get("segment"),
                          state["turn_log"])
-    return {"consent": {"granted": True, "purposes": purposes, "id": cid, "version": CONSENT_VERSION}, "stage": "kyc"}
+    return {"consent": {"granted": True, "purposes": purposes, "id": cid, "version": notice["version"]}, "stage": "kyc"}
 
 
 def after_consent(state: JourneyState) -> Literal["kyc", "__end__"]:

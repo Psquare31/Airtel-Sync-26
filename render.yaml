@@ -25,6 +25,9 @@ services:
         value: "true"
       - key: LOCAL_OCR
         value: "false"
+      # interim: KYC images read by Groq vision until our OCR service is hosted (see ocr_service/)
+      - key: KYC_VISION
+        value: "true"
   - type: web
     name: udyam-api-dev
     runtime: docker
@@ -49,3 +52,6 @@ services:
         value: "true"
       - key: LOCAL_OCR
         value: "false"
+      # interim: KYC images read by Groq vision until our OCR service is hosted (see ocr_service/)
+      - key: KYC_VISION
+        value: "true"

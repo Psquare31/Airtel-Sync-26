@@ -28,9 +28,12 @@ flowchart LR
 
   subgraph Groq["Groq Cloud"]
     GUARD["llama-prompt-guard-2-86m<br/>(input screening)"]
-    CHAT["gpt-oss-120b → qwen3-32b →<br/>llama-3.3-70b → gpt-oss-20b"]
-    VIS["llama-4-scout / maverick<br/>(document vision)"]
+    CHAT["gpt-oss-120b → qwen3.8-27b →<br/>gpt-oss-20b (chat only)"]
     STT["whisper-large-v3-turbo"]
+  end
+
+  subgraph OCRS["Our OCR (target: takes over from Groq vision)"]
+    OCR["RapidOCR + watermark strip + deskew<br/>in memory, nothing stored"]
   end
 
   subgraph Data["Data"]
@@ -46,7 +49,8 @@ flowchart LR
   G --> RULES --> PRICE
   G --> KYC --> ROUTER
   G --> ORD
-  ROUTER --> GUARD & CHAT & VIS & STT
+  ROUTER --> GUARD & CHAT & STT
+  KYC -- "image + X-OCR-Key" --> OCR
   G <--> PG
   KYC --> CSV
   RULES & PROP --> CSV
@@ -96,7 +100,7 @@ Fine-tuning a small Indic model on this data is a later step, once there is real
 | **Deterministic parser runs first** | Numbers, cities, GST yes/no and needs are parsed by regex (English, Hindi, Hinglish) before the LLM. The advisor still works with no API key or when every model is rate-limited. |
 | **Groq model rotation** | On a 429 the router parks that model until its `retry-after` and moves to the next one. Malformed JSON also moves to the next model. When everything is exhausted, the scripted advisor takes over. |
 | **Prompt Guard as a classifier** | `llama-prompt-guard-2-86m` scores each long user message for injection. It is not a chat fallback. A local regex catches the obvious cases offline. |
-| **Two KYC extractors** | Groq vision (Llama 4) is the primary reader. The offline fallback removes the pink watermark by colour, deskews (projection-profile search), runs RapidOCR and pairs label/value boxes by geometry. |
+| **Who reads KYC documents** | The hosted prototype uses Groq vision (`KYC_VISION=true`), stated on the consent screen. Our own OCR is the target: watermark removed by colour, deskewed (projection-profile search), RapidOCR, label/value boxes paired by geometry. It takes over automatically when installed in the API or when `OCR_SERVICE_URL` points at `ocr_service/`, so documents then never reach an AI provider. It can't run inside the 512 MB Render instance. |
 | **Checks in code, not in the model** | GSTIN mod-36 checksum and PAN structure, O/0 OCR repair that is accepted only if the checksum then passes, registry status, fuzzy name/address match, signatory role by constitution, bill age ≤ 90 days, blur score. |
 | **Hybrid LangGraph** | One graph gives a resumable state, conditional routing (fixable vs blocked KYC), human-in-the-loop interrupts and a clear hand-off path to people. |
 | **PWA, not a native app** | One link works on any phone, can be added to the home screen, and needs no store review. API responses are never cached by the service worker. |

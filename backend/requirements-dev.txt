@@ -1,2 +1,4 @@
 -r requirements.txt
+-r requirements-ocr.txt
 pytest==8.4.1
+huggingface_hub==0.34.4

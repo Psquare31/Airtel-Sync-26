@@ -2,6 +2,7 @@ import { AlertTriangle, Camera, CheckCircle2, CloudDownload, FileText, Loader2, 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, type Check, type RegistryResult, type UdyamResult, type UploadResult } from '../../api'
+import { shrinkImage } from '../../components/shrinkImage'
 import type { StepProps } from '../JourneyPage'
 
 const SAMPLES = ['K01', 'K02', 'K03', 'K04', 'K05', 'K06', 'K07', 'K08', 'K09', 'K10', 'K11', 'K12']
@@ -47,7 +48,7 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
     setWorking(docType)
     setErr('')
     try {
-      const r = await api.upload(journey.journey_id, docType, file, specimen)
+      const r = await api.upload(journey.journey_id, docType, file && (await shrinkImage(file)), specimen)
       setDocs((d) => ({ ...d, [docType]: r }))
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('network'))
@@ -212,7 +213,7 @@ function DocCard({ label, optional, doc, failed, working, onFile }: {
             {label} {optional && <span className="text-xs text-muted">(if Udyam-registered)</span>}
           </p>
           {working ? (
-            <p className="text-xs text-muted">Reading your document… this can take up to 30 seconds</p>
+            <p className="text-xs text-muted">Reading your document…</p>
           ) : (
             doc && (
               <p className="truncate text-xs text-muted">
