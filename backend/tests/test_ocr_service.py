@@ -68,3 +68,23 @@ def test_documents_never_go_to_the_llm_by_default(monkeypatch):
     monkeypatch.setattr(ocr, "_vision", lambda *a: called.append(1))
     assert ocr.extract(SPECIMEN, "signatory_id")["extractor"] == "unavailable"
     assert not called
+
+
+def test_consent_names_the_reader_actually_used(monkeypatch):
+    from app.graph.journey import consent_notice
+
+    s = get_settings()
+    monkeypatch.setattr(s, "local_ocr", False)
+    monkeypatch.setattr(s, "ocr_service_url", "")
+    monkeypatch.setattr(s, "kyc_vision", True)
+    monkeypatch.setattr(ocr, "get_router", lambda: SimpleNamespace(available=lambda: True))
+    vision = consent_notice()
+    assert vision["version"].endswith("-vision")
+    assert "Groq" in vision["purposes"]["kyc_verification"]["text"]
+    assert any("Groq Inc. (reads your document images" in p for p in vision["processors"])
+
+    monkeypatch.setattr(s, "ocr_service_url", "https://ocr.example")
+    own = consent_notice()
+    assert own["version"].endswith("-service")
+    assert "never sent to an AI company" in own["purposes"]["kyc_verification"]["text"]
+    assert not any("document images" in p and "Groq" in p for p in own["processors"])

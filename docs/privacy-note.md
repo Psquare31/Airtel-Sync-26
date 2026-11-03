@@ -26,7 +26,7 @@ Each purpose shows what is used, why, and how long it is kept. Every grant is wr
 
 **5. What leaves our boundary (processors).**
 - Before chat text reaches the LLM, a redactor strips GSTIN, PAN, Udyam, Aadhaar-like numbers, phone numbers and emails.
-- **Document images never go to an LLM provider.** They are read by our own OCR service, hosted on Hugging Face as plain infrastructure. It runs our code, needs a secret key on every request, and processes images in memory without storing or logging them.
+- **Document images (interim):** on the hosted prototype they are read by Groq's vision model, and the consent screen names Groq as the processor. We don't store the images. **Target:** our own OCR (built and tested in `ocr_service/`), so images never reach an AI provider. It is a configuration switch, and the consent text changes with it.
 - Voice audio is sent once for transcription and is not stored.
 - Prompt Guard screens inputs for injection attempts.
 

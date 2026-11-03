@@ -13,6 +13,6 @@ Record on a phone-sized browser (Chrome DevTools, 390×844) or a real phone poin
 | 2:30–2:55 | Back-office | Show the funnel, the live hand-off from K07 at the top, and the ranked leads with *next best action*. Assign one to a channel partner. | "Leads the advisor couldn't close go to field sales or partners, ranked by a propensity model. Partners earn on assisted journeys, so digital adds to them rather than competing." |
 | 2:55–3:00 | — | Show the end card with the URL and repo. | "One plan, one bill, activated in days." |
 
-**Before recording:** open the OCR Space's `/health` URL once to wake it, since a sleeping Space takes about a minute to start. After that, each document takes a few seconds. If Groq is slow, type instead of speaking.
+**Before recording:** Groq's free tier reads about 3 document images a minute, so upload the specimen documents shortly before recording or cut the waits in the edit. If Groq is slow, type instead of speaking.
 
-**Voice-over line for KYC:** "Documents are read by our own OCR. They never go to an AI company."
+**Voice-over line for KYC:** "Today an AI reader extracts the fields, and the consent screen says so. Our own OCR is already built and switches on with one setting, so documents never leave our servers."

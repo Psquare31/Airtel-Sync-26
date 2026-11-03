@@ -90,6 +90,18 @@ def _vision(image_bytes: bytes, doc_type: str) -> dict:
     raise LLMUnavailable("vision unavailable")
 
 
+def reader_mode() -> str:
+    """Which reader handles KYC images: 'local', 'service', 'vision' or 'none' (same order as extract)."""
+    settings = get_settings()
+    if settings.ocr_enabled:
+        return "local"
+    if settings.ocr_service_url:
+        return "service"
+    if settings.kyc_vision and get_router().available():
+        return "vision"
+    return "none"
+
+
 def extract(image_bytes: bytes, doc_type: str) -> dict:
     """Returns {detected_type, fields, legible, notes, extractor}."""
     settings = get_settings()
