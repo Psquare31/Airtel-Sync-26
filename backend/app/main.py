@@ -1,7 +1,8 @@
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -16,6 +17,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 settings = get_settings()
 app = FastAPI(title="Udyam Digital API", version="0.1.0")
+log = logging.getLogger("api")
+
+
+@app.middleware("http")
+async def json_errors(request: Request, call_next):
+    """Registered before CORS so it sits inside it: a crash becomes a JSON 500 that still
+    carries CORS headers, instead of a bare 500 the browser misreports as a CORS failure."""
+    try:
+        return await call_next(request)
+    except Exception:  # noqa: BLE001
+        log.exception("unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse({"detail": "Something went wrong on our side. Please try again."}, status_code=500)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_list,

@@ -39,3 +39,16 @@ def test_backoffice_requires_key(client):
     assert client.get("/api/backoffice/summary").status_code == 401
     r = client.get("/api/backoffice/leads?limit=5", headers={"X-Backoffice-Key": "demo"}).json()
     assert len(r["leads"]) == 5 and all(0 <= l["score"] <= 1 for l in r["leads"])
+
+
+def test_crash_is_json_500_with_cors_header(client, monkeypatch):
+    from app.routers import journey as journey_router
+
+    def boom(*a, **k):
+        raise RuntimeError("db connection closed")
+
+    monkeypatch.setattr(journey_router, "get_graph", boom)
+    origin = "https://airtel-sync-26-abc123-team.vercel.app"
+    r = client.post("/api/journeys", json={"lang": "en"}, headers={"Origin": origin})
+    assert r.status_code == 500 and "try again" in r.json()["detail"]
+    assert r.headers.get("access-control-allow-origin") == origin

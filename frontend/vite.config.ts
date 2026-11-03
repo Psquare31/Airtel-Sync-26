@@ -9,6 +9,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // send cookies for the manifest, so Vercel-protected preview URLs can load it
+      useCredentials: true,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Accel Udyam Digital',

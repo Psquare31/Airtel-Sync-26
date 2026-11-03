@@ -367,7 +367,10 @@ def make_checkpointer():
         from psycopg.rows import dict_row
         from psycopg_pool import ConnectionPool
 
-        pool = ConnectionPool(settings.postgres_conninfo, max_size=5, open=True,
+        # Neon closes idle connections: test each one before use and retire idle ones early,
+        # otherwise the first requests after a quiet spell get a dead connection (HTTP 500)
+        pool = ConnectionPool(settings.postgres_conninfo, min_size=1, max_size=5, max_idle=120, max_lifetime=1800,
+                              check=ConnectionPool.check_connection, open=True,
                               kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row})
         saver = PostgresSaver(pool)
         saver.setup()
