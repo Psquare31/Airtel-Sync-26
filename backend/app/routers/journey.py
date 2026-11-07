@@ -98,7 +98,17 @@ class LangBody(BaseModel):
 
 @router.post("/{jid}/lang")
 def set_lang(jid: str, body: LangBody):
-    get_graph().update_state(_config(jid), {"lang": body.lang})
+    # update_state drops a pending interrupt; re-run the waiting step so it asks again, now in the new language
+    waiting = view(jid)["pending"] is not None
+    graph = get_graph()
+    graph.update_state(_config(jid), {"lang": body.lang})
+    if waiting:
+        graph.invoke(None, _config(jid))
+    with session() as s:
+        if j := s.get(Journey, jid):
+            j.lang = body.lang
+            s.add(j)
+            s.commit()
     return view(jid)
 
 

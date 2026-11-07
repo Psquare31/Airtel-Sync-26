@@ -72,7 +72,17 @@ export default function JourneyPage() {
   else if (kind === 'kyc') body = <Kyc {...props} />
   else if (kind === 'esign') body = <ESign {...props} />
   else if (kind === 'chat') body = <Advisor {...props} />
-  else body = <Handoff {...props} />
+  else if (journey.handoff) body = <Handoff {...props} />
+  else
+    // not waiting and not handed off: an unexpected state, never pretend a person has taken over
+    body = (
+      <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <p className="text-bad">{t('network')}</p>
+        <button className="btn btn-ghost" onClick={() => window.location.reload()}>
+          Reload
+        </button>
+      </div>
+    )
 
   return (
     <div className="flex flex-1 flex-col">

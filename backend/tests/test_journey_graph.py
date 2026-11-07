@@ -134,3 +134,25 @@ def test_consent_declined(graph):
     graph.invoke(Command(resume={"action": "accept"}), cfg(jid))
     graph.invoke(Command(resume={"purposes": {"kyc_verification": False}}), cfg(jid))
     assert graph.get_state(cfg(jid)).values["handoff"]["reason"] == "consent_declined"
+
+
+def test_language_switch_keeps_the_step_waiting(graph):
+    def switch(lang):
+        graph.update_state(cfg(jid), {"lang": lang})
+        graph.invoke(None, cfg(jid))
+        return pending(graph, jid)
+
+    jid = start(graph, "JLANG")
+    assert switch("hi")["kind"] == "chat"
+    chat_to_quote(graph, jid)
+    graph.invoke(Command(resume={"action": "update", "contract_months": 24}), cfg(jid))
+    p = switch("en")
+    assert p["kind"] == "quote" and p["quote"]["contract_months"] == 24  # edits survive
+    graph.invoke(Command(resume={"action": "accept"}), cfg(jid))
+    assert switch("hi")["kind"] == "consent"
+    graph.invoke(Command(resume={"purposes": {"kyc_verification": True, "service_activation": True}}), cfg(jid))
+    assert switch("en")["kind"] == "kyc"
+    add_docs(jid)
+    graph.invoke(Command(resume={"action": "submit"}), cfg(jid))
+    assert switch("hi")["kind"] == "esign"
+    assert graph.get_state(cfg(jid)).values["lang"] == "hi"

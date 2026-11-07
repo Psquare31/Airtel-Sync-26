@@ -29,6 +29,8 @@ def test_journey_flow_and_wrong_kind(client):
     j = client.post(f"/api/journeys/{jid}/resume", json={"value": {
         "kind": "chat", "text": "Kirana store in Lucknow, 2 people, one shop, no GST, using mobile hotspot, need UPI billing"}}).json()
     assert j["pending"]["kind"] == "quote" and j["quote"]["monthly_total"] > 0
+    j = client.post(f"/api/journeys/{jid}/lang", json={"lang": "hi"}).json()
+    assert j["lang"] == "hi" and j["pending"]["kind"] == "quote" and j["handoff"] is None
 
 
 def test_digilocker_masks_identifiers(client):
