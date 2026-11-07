@@ -106,6 +106,28 @@ def test_cancelled_gstin_hands_off(graph):
         assert s.get(Journey, jid).handoff_reason == "kyc_blocked"
 
 
+
+def add_foreign_id(jid):
+    with session() as s:
+        s.add(KycDocument(journey_id=jid, doc_type="signatory_id", sha256="y", fields={"fields": {
+            "name": "Neha Kaur", "designation": "Owner", "business_name": "Vindhya Tours & Travels",
+            "valid_till": "2028-01-01"}, "checks": []}))
+        s.commit()
+
+
+def test_mixed_documents_get_one_retry_then_person(graph):
+    jid = start(graph, "JMIX")
+    to_kyc(graph, jid)
+    add_docs(jid)
+    add_foreign_id(jid)
+    graph.invoke(Command(resume={"action": "submit"}), cfg(jid))
+    p = pending(graph, jid)
+    assert p["kind"] == "kyc" and p["last_result"]["outcome"] == "fixable" and p["last_result"]["mixed_businesses"]
+    graph.invoke(Command(resume={"action": "submit"}), cfg(jid))
+    state = graph.get_state(cfg(jid)).values
+    assert state["stage"] == "handoff" and state["handoff"]["reason"] == "kyc_mixed_documents"
+
+
 def test_consent_declined(graph):
     jid = start(graph, "JDEC")
     chat_to_quote(graph, jid)

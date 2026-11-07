@@ -283,7 +283,11 @@ def kyc_node(state: JourneyState) -> dict:
     audit("system", "kyc_checked", state["journey_id"], outcome=result["outcome"],
           failed=[c["id"] for c in result["checks"] if c["status"] == "fail"])
     out: dict = {"kyc_result": result, "kyc_attempts": state.get("kyc_attempts", 0) + 1}
-    if result["outcome"] == "verified":
+    if result.get("mixed_businesses") and (state.get("kyc_result") or {}).get("mixed_businesses"):
+        out["stage"] = "handoff"
+        out["handoff"] = _handoff(state, "kyc_mixed_documents", "Documents from different businesses on two attempts. "
+                                  "Possible identity mismatch: verify the owner in person before activation.")
+    elif result["outcome"] == "verified":
         out["stage"] = "esign"
     elif result["outcome"] == "blocked":
         out["stage"] = "handoff"

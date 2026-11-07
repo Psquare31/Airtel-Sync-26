@@ -20,6 +20,7 @@ from app.services import validators as v
 from app.services.validators import FAIL, PASS, WARN, Check
 
 REQUIRED_DOCS = ("gst_certificate", "signatory_id", "address_proof")
+MIXED_IDS = ("id_business", "udyam_vs_gst")
 OPTIONAL_DOCS = ("udyam_certificate",)
 DOC_LABELS = {
     "gst_certificate": "GST registration certificate",
@@ -260,8 +261,17 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
             else:
                 checks.append(Check("address_match", PASS, "Address matches the GST registration.", "address_proof"))
 
+    # documents from another business: usually a wrong file, so fixable once; repeat goes to a person (graph)
+    mixed = any(c.id in MIXED_IDS and c.status == FAIL for c in checks)
+    if mixed:
+        others = [n for n in (_get(docs, "signatory_id", "business_name") if any(c.id == "id_business" for c in checks) else "",
+                              (udyam_rec or {}).get("enterprise_name") if any(c.id == "udyam_vs_gst" for c in checks) else "") if n]
+        names = list(dict.fromkeys(n for n in (business_name, *others) if n))
+        checks.append(Check("documents_mixed", FAIL, "These documents are for different businesses (" + ", ".join(names) + "). "
+                            "Please upload every document for the same business.", None))
+
     fails = [c for c in checks if c.status == FAIL]
-    blocking_ids = {"gstin_status", "gstin_registry", "gst_legal_name", "gst_trade_name", "udyam_vs_gst", "id_business"}
+    blocking_ids = {"gstin_status", "gstin_registry", "gst_legal_name", "gst_trade_name"}
     if not fails:
         outcome = "verified"
     elif any(c.id in blocking_ids for c in fails):
@@ -270,6 +280,7 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
         outcome = "fixable"
     return {
         "outcome": outcome,
+        "mixed_businesses": mixed,
         "checks": [c.to_dict() for c in _dedupe(checks)],
         "registry": registry,
         "business_name": business_name,

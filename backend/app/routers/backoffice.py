@@ -20,6 +20,7 @@ HANDOFF_ACTIONS = {
     "kyc_blocked": "Partner to resolve registration issue",
     "kyc_assist_requested": "Partner to collect documents",
     "kyc_repeated_failure": "Partner to collect documents",
+    "kyc_mixed_documents": "Verify owner identity in person (documents from different businesses)",
 }
 
 

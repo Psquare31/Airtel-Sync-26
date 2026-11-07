@@ -149,7 +149,7 @@ def test_typed_udyam_of_another_business_is_flagged():  # K02's Udyam typed with
     assert "udyam_typed_vs_gst" in failed(res) and res["outcome"] != "verified"
 
 
-def test_udyam_certificate_of_another_business_blocks():
+def test_udyam_certificate_of_another_business_is_mixed():
     res = verify({
         "gst_certificate": gst("19E0GXH4115Y1ZL", "Joseph Shah (Prop. Harmony Dental Care)", "Harmony Dental Care",
                                address=K02_ADDR),
@@ -157,4 +157,5 @@ def test_udyam_certificate_of_another_business_blocks():
         "signatory_id": sig("JosephShah", "Manager", "Harmony Dental Care"),
         "address_proof": bill("Harmony Dental Care", K02_ADDR, "2026-05-22"),
     })
-    assert "udyam_vs_gst" in failed(res) and res["outcome"] == "blocked"
+    assert {"udyam_vs_gst", "documents_mixed"} <= failed(res) and res["outcome"] == "fixable" and res["mixed_businesses"]
+    assert "Balaji Realty LLP" in next(c["message"] for c in res["checks"] if c["id"] == "documents_mixed")
