@@ -36,9 +36,13 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
       setUdyamLookup(null)
       return
     }
-    const h = setTimeout(() => api.udyam(u).then(setUdyamLookup).catch(() => setUdyamLookup(null)), 300)
+    const g = gstin.trim().toUpperCase()
+    const h = setTimeout(
+      () => api.udyam(u, GSTIN_RE.test(g) ? g : undefined).then(setUdyamLookup).catch(() => setUdyamLookup(null)),
+      300,
+    )
     return () => clearTimeout(h)
-  }, [udyam])
+  }, [udyam, gstin])
 
   if (p?.kind !== 'kyc') return null
   const docTypes = [...p.required, ...p.optional]
@@ -118,12 +122,14 @@ export default function Kyc({ journey, resume, busy }: StepProps) {
           aria-label="Udyam number"
         />
         {udyamLookup && (
-          <p className={`text-sm ${udyamLookup.found ? 'text-ok' : 'text-bad'}`}>
+          <p className={`text-sm ${udyamLookup.found && udyamLookup.gst_match !== false ? 'text-ok' : 'text-bad'}`}>
             {!udyamLookup.valid_format
               ? udyamLookup.problems?.join('. ')
               : !udyamLookup.found
                 ? 'Not found in the Udyam registry'
-                : `${udyamLookup.enterprise_name} · ${udyamLookup.enterprise_type} enterprise · ${udyamLookup.city}`}
+                : udyamLookup.gst_match === false
+                  ? `Registered to ${udyamLookup.enterprise_name}, not ${udyamLookup.gst_trade_name} on your GSTIN. Check the number.`
+                  : `${udyamLookup.enterprise_name} · ${udyamLookup.enterprise_type} enterprise · ${udyamLookup.city}`}
           </p>
         )}
       </section>

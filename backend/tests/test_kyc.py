@@ -134,3 +134,27 @@ def test_udyam_registration_lookup():
 
     assert _registered_udyam(get_dataset().gstin["32TZAXB5481U1Z1"])["udyam_number"] == "UDYAM-KL-00-5521886"
     assert _registered_udyam(get_dataset().gstin["37IHKXV5167L1ZS"]) is None  # K01: no Udyam registration
+
+
+def test_typed_udyam_of_another_business_is_flagged():  # K02's Udyam typed with a different GSTIN
+    from app.data.loader import get_dataset
+
+    rec = get_dataset().gstin["27XUIXG0767D1ZP"]
+    res = verify({
+        "gst_certificate": gst("27XUIXG0767D1ZP", rec["legal_name"], rec["trade_name"], rec["constitution"],
+                               rec["principal_place_of_business"]),
+        "signatory_id": sig("Owner", "Proprietor", rec["trade_name"]),
+        "address_proof": bill(rec["trade_name"], rec["principal_place_of_business"], "2026-06-01"),
+    }, {"udyam_number": "UDYAM-WB-00-5053330"})
+    assert "udyam_typed_vs_gst" in failed(res) and res["outcome"] != "verified"
+
+
+def test_udyam_certificate_of_another_business_blocks():
+    res = verify({
+        "gst_certificate": gst("19E0GXH4115Y1ZL", "Joseph Shah (Prop. Harmony Dental Care)", "Harmony Dental Care",
+                               address=K02_ADDR),
+        "udyam_certificate": udyam("UDYAM-KL-00-5521886", "Balaji Realty LLP"),
+        "signatory_id": sig("JosephShah", "Manager", "Harmony Dental Care"),
+        "address_proof": bill("Harmony Dental Care", K02_ADDR, "2026-05-22"),
+    })
+    assert "udyam_vs_gst" in failed(res) and res["outcome"] == "blocked"

@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.data.loader import get_dataset
 from app.services import orders
 from app.services.advisor import LANG_NAMES
+from app.services.kyc import same_business
 from app.services.llm import LLMUnavailable, get_router
 from app.services.validators import normalize_id, validate_gstin, validate_udyam
 
@@ -33,7 +34,8 @@ def gstin_lookup(gstin: str):
 
 
 @router.get("/registry/udyam/{number}")
-def udyam_lookup(number: str):
+def udyam_lookup(number: str, gstin: str | None = None):
+    """With ?gstin=, also says whether both registrations belong to the same business."""
     u = normalize_id(number)
     problems = validate_udyam(u)
     if problems:
@@ -41,8 +43,13 @@ def udyam_lookup(number: str):
     rec = get_dataset().udyam.get(u)
     if not rec:
         return {"valid_format": True, "found": False}
-    return {"valid_format": True, "found": True, **{k: rec[k] for k in
-            ("enterprise_name", "enterprise_type", "major_activity", "state", "city", "date_of_registration")}}
+    out = {"valid_format": True, "found": True, **{k: rec[k] for k in
+           ("enterprise_name", "enterprise_type", "major_activity", "state", "city", "date_of_registration")}}
+    gst_rec = get_dataset().gstin.get(normalize_id(gstin)) if gstin else None
+    if gst_rec:
+        out["gst_match"] = same_business(rec, gst_rec)
+        out["gst_trade_name"] = gst_rec["trade_name"]
+    return out
 
 
 @router.get("/orders/{order_id}")

@@ -51,7 +51,8 @@ export const api = {
   withdraw: (id: string, purposes: string[]) =>
     post<{ withdrawn: string[]; documents_erased: number }>(`/api/journeys/${id}/consent/withdraw`, { purposes }),
   gstin: (g: string) => request<RegistryResult>(`/api/registry/gstin/${encodeURIComponent(g)}`),
-  udyam: (u: string) => request<UdyamResult>(`/api/registry/udyam/${encodeURIComponent(u)}`),
+  udyam: (u: string, gstin?: string) =>
+    request<UdyamResult>(`/api/registry/udyam/${encodeURIComponent(u)}${gstin ? `?gstin=${encodeURIComponent(gstin)}` : ''}`),
   order: (id: string) => request<OrderView>(`/api/orders/${id}`),
   advance: (id: string) => post<OrderView>(`/api/orders/${id}/advance`),
   ask: (id: string, question: string, lang: string) =>
@@ -95,6 +96,8 @@ export interface UdyamResult {
   major_activity?: string
   state?: string
   city?: string
+  gst_match?: boolean
+  gst_trade_name?: string
 }
 
 export interface Check {

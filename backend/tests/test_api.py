@@ -15,6 +15,9 @@ def test_health_and_registry(client):
     assert r["found"] and r["status"] == "Cancelled"
     assert client.get("/api/registry/gstin/37IHKXV5167L1ZX").json()["valid_format"] is False
     assert client.get("/api/registry/udyam/UDYAM-WB-00-5053330").json()["found"]
+    assert client.get("/api/registry/udyam/UDYAM-WB-00-5053330?gstin=19EOGXH4115Y1ZL").json()["gst_match"] is True
+    other = client.get("/api/registry/udyam/UDYAM-WB-00-5053330?gstin=27XUIXG0767D1ZP").json()
+    assert other["gst_match"] is False and other["gst_trade_name"] == "Ganesh Woodcraft"
 
 
 def test_journey_flow_and_wrong_kind(client):

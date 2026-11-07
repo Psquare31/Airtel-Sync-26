@@ -188,11 +188,15 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
                 else:
                     checks.append(Check("udyam_registry", PASS, f"Udyam registration found ({udyam_rec['enterprise_type']} enterprise).", "udyam_certificate"))
                 if gst_rec:
-                    trade = gst_rec["trade_name"]
-                    if v.name_similarity(udyam_rec["enterprise_name"], trade) < 85:
+                    if not same_business(udyam_rec, gst_rec):
                         checks.append(Check("udyam_vs_gst", FAIL, "Udyam enterprise name doesn't match the GST trade name.", "udyam_certificate"))
                     if v.udyam_state(number) and v.udyam_state(number) != gst_rec["state"]:
                         checks.append(Check("udyam_state", WARN, "Udyam and GST registrations are in different states.", "udyam_certificate"))
+    elif gst_rec and declared.get("udyam_number") and (typed_rec := ds.udyam.get(v.normalize_id(declared["udyam_number"])))             and not same_business(typed_rec, gst_rec):
+        checks.append(Check("udyam_typed_vs_gst", FAIL,
+                            f"The Udyam number you typed is registered to \"{typed_rec['enterprise_name']}\", not to "
+                            f"\"{gst_rec['trade_name']}\" on your GST registration. Correct it, or leave it blank.",
+                            "udyam_certificate"))
     elif gst_rec and (reg := _registered_udyam(gst_rec)):
         checks.append(Check("missing_udyam_certificate", FAIL,
                             f"Your business is Udyam-registered ({v.mask(reg['udyam_number'], 6, 3)}). "
@@ -272,6 +276,11 @@ def verify(docs: dict[str, dict], declared: dict | None = None) -> dict:
         "constitution": constitution,
         "gstin_masked": v.mask(v.normalize_id(gstin_raw)) if gstin_raw else "",
     }
+
+
+def same_business(udyam_rec: dict, gst_rec: dict) -> bool:
+    """Udyam enterprise and GST trade name refer to the same business."""
+    return v.name_similarity(udyam_rec["enterprise_name"], gst_rec["trade_name"]) >= 85
 
 
 def _registered_udyam(gst_rec: dict) -> dict | None:
